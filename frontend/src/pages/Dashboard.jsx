@@ -1,42 +1,97 @@
-import { ArrowRight, CalendarDays, Sparkles, WalletCards } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { ArrowRight, CalendarDays, CheckCircle2, Clock, HeartHandshake, ListTodo, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
 
-import CampaignCard from "../components/CampaignCard";
-import MetricCard from "../components/MetricCard";
-import OpportunityCard from "../components/OpportunityCard";
-import SectionHeader from "../components/SectionHeader";
-import TaskCard from "../components/TaskCard";
-import { campaigns, metrics, opportunities, tasks } from "../data/dashboardData";
+import { myEvents } from "../api/campaigns";
+import { myContributions } from "../api/impact";
+import { getMyProfile, getRecommended, myTasks } from "../api/opportunities";
+import { listNotifications } from "../api/notifications";
+import { ErrorState, Loading } from "../components/AsyncState";
+import { StatusPill } from "../components/Chips";
+import { Stat } from "../components/Notice";
+import { useAuth } from "../context/AuthContext";
+import useAsync from "../hooks/useAsync";
 
+/** Volunteer home: everything comes from the API (no demo numbers). */
 export default function Dashboard() {
-  const navigate = useNavigate();
-  const [taskList, setTaskList] = useState(tasks);
-
-  const completeTask = (taskId) => {
-    setTaskList((current) => current.map((task) => task.id === taskId ? { ...task, status: "Completed", progress: 100 } : task));
-  };
+  const { user } = useAuth();
+  const { data, loading, error, reload } = useAsync(async () => {
+    const [profile, impact, tasks, picks, events, alerts] = await Promise.all([
+      getMyProfile(), myContributions(), myTasks({ page_size: 20 }), getRecommended(3), myEvents({ page_size: 3 }),
+      listNotifications({ priority: "HIGH", status: "UNREAD", page_size: 3 }),
+    ]);
+    return { profile, impact, tasks, picks, events, alerts };
+  });
+  if (loading) return <Loading rows={4} />;
+  if (error) return <ErrorState message={error} onRetry={reload} />;
+  const { profile, impact, tasks, picks, events, alerts } = data;
+  const open = tasks.items.filter((t) => ["PENDING", "ACCEPTED", "IN_PROGRESS"].includes(t.status));
 
   return (
-    <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#4c176f] via-[#6b21a8] to-[#8b3fc1] px-6 py-7 text-white shadow-xl shadow-purple-900/15 sm:px-8 sm:py-8">
-        <div className="absolute -right-10 -top-20 h-64 w-64 rounded-full border-[28px] border-white/5" /><div className="absolute -bottom-36 right-24 h-72 w-72 rounded-full border-[34px] border-white/5" />
-        <div className="relative z-10 flex flex-col justify-between gap-7 md:flex-row md:items-end"><div><p className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-purple-100"><Sparkles size={12} />Tuesday, October 01, 2024</p><h1 className="max-w-xl font-display text-[27px] font-bold leading-tight tracking-[-0.045em] sm:text-[31px]">Good morning, Wasikul <span className="text-amber-300">👋</span></h1><p className="mt-3 max-w-lg text-sm leading-6 text-purple-100">You have <strong className="text-white">4 assigned tasks</strong> and <strong className="text-white">3 new high-match opportunities</strong> waiting for you today.</p></div><button onClick={() => navigate("/opportunities")} className="group inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#f59e0b] px-5 py-3 text-xs font-extrabold text-[#3b1d06] shadow-lg shadow-amber-950/20 transition hover:bg-[#fbbf24]">Find opportunities <ArrowRight size={15} className="transition group-hover:translate-x-1" /></button></div>
+    <div className="space-y-6">
+      <section className="rounded-2xl bg-gradient-to-br from-[#3b1d5a] to-[#6b21a8] p-6 text-white sm:p-8">
+        <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em]"><Sparkles size={12} />Welcome back</p>
+        <h1 className="mt-3 font-display text-2xl font-bold sm:text-3xl">Hello, {user.name.split(" ")[0]} 👋</h1>
+        <p className="mt-2 text-sm text-purple-100">
+          You have <strong className="text-white">{open.length} open {open.length === 1 ? "task" : "tasks"}</strong>
+          {picks.length > 0 && <> and <strong className="text-white">{picks.filter((p) => p.match.percentage >= 40).length} strong matches</strong> waiting</>}.
+        </p>
+        <Link to="/opportunities" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#f59e0b] px-5 py-3 text-xs font-extrabold text-[#3b1d06] hover:bg-[#fbbf24]">Find opportunities <ArrowRight size={15} /></Link>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metrics.map((metric) => <MetricCard key={metric.label} metric={metric} />)}</section>
+      {!profile.profile_complete && (
+        <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Your profile is incomplete. Add your <strong>mobile number</strong>, city and skills to get better matches and be able to apply. <Link className="font-bold underline" to="/profile">Complete profile</Link>
+        </p>
+      )}
+      {alerts.items.map((a) => (
+        <div key={a.id} role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          <strong>{a.title}.</strong> {a.message} {a.link && <Link className="font-bold underline" to={a.link}>Open</Link>}
+        </div>
+      ))}
 
-      <section>
-        <SectionHeader eyebrow="Personalized for your profile" title="Smart volunteer matching" action="View all opportunities" onAction={() => navigate("/opportunities")} />
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">{opportunities.slice(0, 4).map((opportunity) => <OpportunityCard key={opportunity.id} opportunity={opportunity} compact />)}</div>
-      </section>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat label="Volunteer hours" value={`${impact.total_hours} hrs`} />
+        <Stat label="Events attended" value={impact.events_attended} />
+        <Stat label="Tasks completed" value={impact.tasks_completed} hint={`of ${impact.tasks_total} assigned`} />
+        <Stat label="People reached" value={impact.people_reached} hint={`${impact.ngos_supported} NGO${impact.ngos_supported === 1 ? "" : "s"} supported`} />
+      </div>
 
-      <section className="grid gap-8 xl:grid-cols-[1.05fr_1.5fr]">
-        <div><SectionHeader eyebrow="Keep your momentum going" title="Assigned tasks" action="View all tasks" onAction={() => navigate("/tasks")} /><div className="space-y-3">{taskList.slice(0, 3).map((task) => <TaskCard key={task.id} task={task} compact onComplete={completeTask} />)}</div></div>
-        <div><SectionHeader eyebrow="Support the causes you care about" title="Active campaigns & relief" action="Explore campaigns" onAction={() => navigate("/campaigns")} /><div className="grid gap-4 md:grid-cols-2">{campaigns.slice(0, 2).map((campaign) => <CampaignCard key={campaign.id} campaign={campaign} />)}</div></div>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-3"><div className="surface-card flex items-center gap-4 p-5 md:col-span-2"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-purple-50 text-purple-700"><CalendarDays size={21} /></div><div><p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Next on your calendar</p><h3 className="mt-1 text-sm font-bold text-slate-800">Volunteer orientation · Thursday, 10:00 AM</h3><p className="mt-1 text-xs font-medium text-slate-400">Shobuj Foundation · Online session</p></div><button className="ml-auto hidden text-xs font-bold text-purple-700 hover:text-purple-900 sm:block">View event</button></div><div className="surface-card flex items-center gap-4 p-5"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600"><WalletCards size={21} /></div><div><p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Your impact</p><h3 className="mt-1 text-sm font-bold text-slate-800">340+ people reached</h3><p className="mt-1 text-xs font-medium text-emerald-600">Keep making a difference ↗</p></div></div></section>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="surface-card p-5">
+          <div className="flex items-center justify-between"><h2 className="flex items-center gap-2 font-display text-lg font-bold text-slate-900"><HeartHandshake size={18} />Recommended for you</h2><Link to="/opportunities" className="text-xs font-bold text-purple-700">See all</Link></div>
+          {picks.length === 0 ? <p className="mt-3 text-sm text-slate-500">No open opportunities right now.</p> : (
+            <ul className="mt-3 divide-y divide-slate-100">
+              {picks.map((p) => (
+                <li key={p.opportunity.id} className="flex items-center justify-between gap-3 py-3">
+                  <div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900">{p.opportunity.title}</p><p className="truncate text-xs text-slate-500">{p.opportunity.ngo_name} · {p.opportunity.location || "Flexible"}</p></div>
+                  <span className="shrink-0 rounded-full bg-purple-50 px-2.5 py-1 text-xs font-extrabold text-purple-700">{p.match.percentage}%</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        <section className="surface-card p-5">
+          <div className="flex items-center justify-between"><h2 className="flex items-center gap-2 font-display text-lg font-bold text-slate-900"><ListTodo size={18} />My open tasks</h2><Link to="/tasks" className="text-xs font-bold text-purple-700">All tasks</Link></div>
+          {open.length === 0 ? <p className="mt-3 text-sm text-slate-500">No open tasks. Tasks appear once an NGO accepts you and assigns one.</p> : (
+            <ul className="mt-3 divide-y divide-slate-100">
+              {open.slice(0, 4).map((t) => (
+                <li key={t.id} className="flex items-center justify-between gap-3 py-3">
+                  <div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900">{t.task_name}</p><p className="flex items-center gap-1 text-xs text-slate-500"><Clock size={12} />{t.deadline ? `due ${t.deadline}` : "no deadline"} · {t.campaign_title}</p></div>
+                  <StatusPill status={t.status} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        <section className="surface-card p-5 lg:col-span-2">
+          <div className="flex items-center justify-between"><h2 className="flex items-center gap-2 font-display text-lg font-bold text-slate-900"><CalendarDays size={18} />Upcoming events</h2><Link to="/events" className="text-xs font-bold text-purple-700">Browse events</Link></div>
+          {events.items.length === 0 ? <p className="mt-3 text-sm text-slate-500">Nothing on your roster yet. <Link className="font-bold text-purple-700" to="/events">Join an event</Link>.</p> : (
+            <ul className="mt-3 divide-y divide-slate-100">
+              {events.items.map((e) => <li key={e.id} className="flex items-center gap-3 py-3 text-sm"><CheckCircle2 size={16} className="text-emerald-500" /><span className="font-bold text-slate-900">{e.event_name}</span><span className="text-xs text-slate-500">{e.event_date} · {e.campaign_title}</span></li>)}
+            </ul>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

@@ -242,7 +242,9 @@ def test_task_lists(client, ngo_headers, volunteer_headers, volunteer2_headers):
     assert client.get(f"{API}/tasks/me?status=COMPLETED", headers=volunteer_headers).json()["total"] == 0
     assert client.get(f"{API}/tasks", headers=ngo_headers).json()["total"] == 2
     assert client.get(f"{API}/tasks?volunteer_id={vid}", headers=ngo_headers).json()["total"] == 1
-    assert client.get(f"{API}/tasks", headers=volunteer_headers).status_code == 403
+    # the report's GET /tasks is role-aware: a volunteer gets their own tasks, never the NGO-wide list
+    own = client.get(f"{API}/tasks", headers=volunteer_headers).json()
+    assert [t["task_name"] for t in own["items"]] == ["Mine"]
 
 
 def test_closed_campaign_blocks_tasks(client, ngo_headers):

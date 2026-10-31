@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
 
-import { getMyNgo, updateMyNgo } from "../../api/campaigns";
-import { parseError } from "../../api/client";
+import { getMyNgo, removeLogo, updateMyNgo, uploadLogo } from "../../api/campaigns";
+import { apiBaseUrl, parseError } from "../../api/client";
 import { ErrorState, Loading } from "../../components/AsyncState";
 import FormField, { inputClass, primaryButton, textareaClass } from "../../components/FormField";
 import useAsync from "../../hooks/useAsync";
@@ -33,6 +33,7 @@ export default function OrganisationProfile() {
       await updateMyNgo({
         ngo_name: form.ngo_name, description: form.description || null,
         address: form.address || null, contact: form.contact || null,
+        contact_number: form.contact_number || null, registration_info: form.registration_info || null,
       });
       setDraft(null);
       reload();
@@ -45,6 +46,19 @@ export default function OrganisationProfile() {
     }
   }
 
+  async function onLogo(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setFeedback({ ok: "", error: "", fields: {} });
+    try { await uploadLogo(file); reload(); setFeedback({ ok: "Logo updated.", error: "", fields: {} }); }
+    catch (err) { const p = parseError(err); setFeedback({ ok: "", error: p.fields.file || p.message, fields: {} }); }
+  }
+
+  async function onRemoveLogo() {
+    try { await removeLogo(); reload(); } catch (err) { setFeedback({ ok: "", error: parseError(err).message, fields: {} }); }
+  }
+
   return (
     <div className="space-y-6">
       <section className="surface-card p-6">
@@ -52,6 +66,7 @@ export default function OrganisationProfile() {
           <h1 className="font-display text-2xl font-bold text-slate-900">{ngo.ngo_name}</h1>
           <span className={`rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider ring-1 ${STATUS_STYLE[ngo.verification_status]}`}>{ngo.verification_status}</span>
         </div>
+        {ngo.verification_remarks && <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2.5 text-sm text-slate-700"><strong>Note from the platform team:</strong> {ngo.verification_remarks}</p>}
         {ngo.verification_status !== "VERIFIED" && (
           <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
             {ngo.verification_status === "PENDING"
@@ -70,11 +85,27 @@ export default function OrganisationProfile() {
         {feedback.ok && <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-emerald-700">{feedback.ok}</p>}
         {feedback.error && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2.5 text-sm font-semibold text-rose-700">{feedback.error}</p>}
         <FormField label="Name" error={feedback.fields.ngo_name}><input className={inputClass} value={form.ngo_name} onChange={set("ngo_name")} required /></FormField>
+        <div className="flex items-center gap-4">
+          {ngo.logo_url ? <img src={`${apiBaseUrl}${ngo.logo_url}`} alt={`${ngo.ngo_name} logo`} className="h-16 w-16 rounded-xl border border-slate-200 object-cover" />
+            : <span className="grid h-16 w-16 place-items-center rounded-xl bg-slate-100 text-[10px] font-bold text-slate-400">NO LOGO</span>}
+          <div className="space-y-1">
+            <label className="inline-block cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-purple-300">
+              {ngo.logo_url ? "Replace logo" : "Upload logo"}
+              <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={onLogo} />
+            </label>
+            {ngo.logo_url && <button type="button" onClick={onRemoveLogo} className="ml-2 text-xs font-bold text-rose-600">Remove</button>}
+            <p className="text-[11px] text-slate-400">PNG, JPG or WEBP, up to 2 MB.</p>
+          </div>
+        </div>
         <FormField label="Description" error={feedback.fields.description}><textarea className={textareaClass} rows={3} value={form.description ?? ""} onChange={set("description")} /></FormField>
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Address" error={feedback.fields.address}><input className={inputClass} value={form.address ?? ""} onChange={set("address")} /></FormField>
-          <FormField label="Contact" error={feedback.fields.contact}><input className={inputClass} value={form.contact ?? ""} onChange={set("contact")} /></FormField>
+          <FormField label="Public contact email" error={feedback.fields.contact}><input className={inputClass} type="email" value={form.contact ?? ""} onChange={set("contact")} /></FormField>
+          <FormField label="Contact number" error={feedback.fields.contact_number}><input className={inputClass} type="tel" value={form.contact_number ?? ""} onChange={set("contact_number")} /></FormField>
         </div>
+        <FormField label="Registration information" error={feedback.fields.registration_info}>
+          <textarea className={textareaClass} rows={2} value={form.registration_info ?? ""} onChange={set("registration_info")} />
+        </FormField>
         <button className={primaryButton} disabled={saving || !draft}>{saving ? "Saving…" : "Save changes"}</button>
       </form>
     </div>

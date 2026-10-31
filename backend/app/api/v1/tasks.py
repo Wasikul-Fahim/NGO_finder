@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
-from app.api.deps import CurrentNgo, CurrentUser, DbSession, VerifiedNgo
+from app.api.deps import CurrentUser, DbSession, VerifiedNgo
 from app.api.v1.volunteers import VolunteerUser, get_volunteer
 from app.core.errors import AppError, conflict, forbidden, not_found
 from app.models import (
@@ -12,6 +12,7 @@ from app.models import (
     NotificationPriority,
     NotificationType,
     Opportunity,
+    Role,
     Task,
     TaskStatus,
     Volunteer,
@@ -99,15 +100,22 @@ def my_tasks(
 
 @router.get("", response_model=Page[TaskOut])
 def list_tasks(
-    ngo: CurrentNgo, db: DbSession, params: Annotated[PageParams, Depends()],
+    user: CurrentUser, db: DbSession, params: Annotated[PageParams, Depends()],
     status: TaskStatus | None = None, campaign_id: int | None = None, volunteer_id: int | None = None,
 ):
-    stmt = _base().join(Task.campaign).where(Campaign.ngo_id == ngo.id)
+    """Role-aware: volunteers get their own tasks, NGO admins their NGO's, platform admins all."""
+    stmt = _base().join(Task.campaign)
+    if user.role == Role.VOLUNTEER:
+        stmt = stmt.where(Task.volunteer_id == get_volunteer(db, user).id)
+    elif user.role == Role.NGO_ADMIN:
+        stmt = stmt.where(Campaign.ngo_id == campaign_svc.user_ngo_id(db, user))
+    elif user.role != Role.PLATFORM_ADMIN:
+        raise forbidden("Tasks are available to volunteers and admins.")
     if status:
         stmt = stmt.where(Task.status == status)
     if campaign_id:
         stmt = stmt.where(Task.campaign_id == campaign_id)
-    if volunteer_id:
+    if volunteer_id and user.role != Role.VOLUNTEER:
         stmt = stmt.where(Task.volunteer_id == volunteer_id)
     return paginate(db, stmt.order_by(Task.created_at.desc(), Task.id.desc()), params, to_out)
 

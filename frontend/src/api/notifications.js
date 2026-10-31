@@ -8,3 +8,5 @@ export const markRead = (id) => api.patch(`/api/v1/notifications/${id}/read`).th
 export const markAllRead = () => api.patch("/api/v1/notifications/read-all");
 export const sendAnnouncement = (body) => api.post("/api/v1/announcements", body).then(unwrap);
 export const sendEventReminder = (eventId) => api.post(`/api/v1/events/${eventId}/reminders`).then(unwrap);
+export const getNotificationSettings = () => api.get("/api/v1/notifications/settings").then(unwrap);
+export const saveNotificationSettings = (muted_types) => api.put("/api/v1/notifications/settings", { muted_types }).then(unwrap);

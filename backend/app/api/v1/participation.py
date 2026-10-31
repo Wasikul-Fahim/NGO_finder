@@ -3,7 +3,7 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
@@ -12,6 +12,7 @@ from app.api.v1.volunteers import VolunteerUser, get_volunteer
 from app.core.errors import AppError, conflict, forbidden, not_found
 from app.models import (
     Campaign,
+    CampaignBeneficiary,
     Event,
     NotificationPriority,
     NotificationType,
@@ -29,6 +30,7 @@ from app.schemas.impact import (
     ParticipationUpdate,
 )
 from app.services import workflow
+from app.services.access import volunteer_viewer
 from app.services.audit import log_action
 from app.services.notifications import notify
 from app.services.pagination import PageParams, paginate
@@ -62,6 +64,7 @@ def _owned_event(db, event_id: int, ngo) -> Event:
 
 
 @router.post("/participation", response_model=ParticipationOut, status_code=201)
+@router.post("/participations", response_model=ParticipationOut, status_code=201, include_in_schema=False)
 def record(data: ParticipationCreate, ngo: VerifiedNgo, user: CurrentUser, db: DbSession):
     event = _owned_event(db, data.event_id, ngo)
     if event.event_date > date.today():
@@ -94,6 +97,7 @@ def record(data: ParticipationCreate, ngo: VerifiedNgo, user: CurrentUser, db: D
 
 
 @router.patch("/participation/{participation_id}", response_model=ParticipationOut)
+@router.patch("/participations/{participation_id}", response_model=ParticipationOut, include_in_schema=False)
 def update(participation_id: int, data: ParticipationUpdate, ngo: VerifiedNgo, user: CurrentUser, db: DbSession):
     p = db.scalar(_base().where(Participation.id == participation_id))
     if p is None:
@@ -120,6 +124,7 @@ def update(participation_id: int, data: ParticipationUpdate, ngo: VerifiedNgo, u
 
 
 @router.get("/participation", response_model=Page[ParticipationOut])
+@router.get("/participations", response_model=Page[ParticipationOut], include_in_schema=False)
 def list_participation(
     ngo: CurrentNgo, db: DbSession, params: Annotated[PageParams, Depends()],
     event_id: int | None = None, volunteer_id: int | None = None,
@@ -133,25 +138,45 @@ def list_participation(
                     params, to_out)
 
 
-@router.get("/contributions/me", response_model=ContributionOut)
-def my_contributions(user: VolunteerUser, db: DbSession):
-    vol = get_volunteer(db, user)
-    records = db.scalars(
-        _base().where(Participation.volunteer_id == vol.id)
-        .order_by(Participation.participation_date.desc(), Participation.id.desc())
-    ).unique().all()
+def build_contributions(db, vol, ngo_id: int | None = None) -> ContributionOut:
+    """Hours/attendance/tasks for one volunteer; with `ngo_id`, only what happened inside that NGO."""
+    stmt = _base().where(Participation.volunteer_id == vol.id)
+    task_stmt = select(Task.status, func.count()).where(Task.volunteer_id == vol.id)
+    if ngo_id is not None:
+        stmt = stmt.join(Participation.event).join(Event.campaign).where(Campaign.ngo_id == ngo_id)
+        task_stmt = task_stmt.join(Campaign, Task.campaign_id == Campaign.id).where(Campaign.ngo_id == ngo_id)
+    records = db.scalars(stmt.order_by(Participation.participation_date.desc(), Participation.id.desc())).unique().all()
     attended = [r for r in records if r.attendance]
     monthly: dict[str, float] = defaultdict(float)
     for r in attended:
         monthly[r.participation_date.strftime("%Y-%m")] += float(r.hours or 0)
-    task_counts = dict(db.execute(
-        select(Task.status, func.count()).where(Task.volunteer_id == vol.id).group_by(Task.status)
-    ).all())
+    task_counts = dict(db.execute(task_stmt.group_by(Task.status)).all())
+    campaign_ids = {r.event.campaign_id for r in attended}
+    people = db.scalar(
+        select(func.count(distinct(CampaignBeneficiary.beneficiary_id)))
+        .where(CampaignBeneficiary.campaign_id.in_(campaign_ids))) if campaign_ids else 0
     return ContributionOut(
         total_hours=round(sum(float(r.hours or 0) for r in attended), 2),
         events_attended=len(attended),
         tasks_completed=task_counts.get(TaskStatus.COMPLETED, 0),
         tasks_total=sum(task_counts.values()),
+        ngos_supported=len({r.event.campaign.ngo_id for r in attended}),
+        people_reached=people or 0,
         monthly_hours=[MonthlyHours(month=m, hours=round(h, 2)) for m, h in sorted(monthly.items())],
         history=[to_out(r) for r in records[:50]],
     )
+
+
+@router.get("/contributions/me", response_model=ContributionOut)
+def my_contributions(user: VolunteerUser, db: DbSession):
+    return build_contributions(db, get_volunteer(db, user))
+
+
+@router.get("/volunteers/{volunteer_id}/contributions", response_model=ContributionOut)
+def volunteer_contributions(volunteer_id: int, user: CurrentUser, db: DbSession):
+    """NGO admins review the contribution of volunteers who applied to them (limited to their own NGO)."""
+    vol = db.get(Volunteer, volunteer_id)
+    if vol is None:
+        raise not_found("Volunteer")
+    _, ngo_id = volunteer_viewer(db, user, vol)
+    return build_contributions(db, vol, ngo_id)

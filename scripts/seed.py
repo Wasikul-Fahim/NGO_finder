@@ -40,24 +40,26 @@ from app.models import (
 PASSWORD = os.environ.get("SEED_PASSWORD", "Demo12345")
 
 USERS = [
-    ("admin@example.com", "Platform Admin", Role.PLATFORM_ADMIN, "Dhaka"),
-    ("ngo@example.com", "Shobuj Foundation Admin", Role.NGO_ADMIN, "Dhaka"),
-    ("volunteer1@example.com", "Ayesha Rahman", Role.VOLUNTEER, "Dhaka"),
-    ("volunteer2@example.com", "Tanvir Hossain", Role.VOLUNTEER, "Sylhet"),
-    ("donor1@example.com", "Nusrat Jahan", Role.DONOR, "Dhaka"),
-    ("beneficiary1@example.com", "Rahim Uddin", Role.BENEFICIARY, "Sylhet"),
+    ("admin@example.com", "Platform Admin", Role.PLATFORM_ADMIN, "Dhaka", "01700000001"),
+    ("ngo@example.com", "Shobuj Foundation Admin", Role.NGO_ADMIN, "Dhaka", "01700000002"),
+    ("volunteer1@example.com", "Ayesha Rahman", Role.VOLUNTEER, "Dhaka", "01711111111"),
+    ("volunteer2@example.com", "Tanvir Hossain", Role.VOLUNTEER, "Sylhet", "01722222222"),
+    ("donor1@example.com", "Nusrat Jahan", Role.DONOR, "Dhaka", "01733333333"),
+    ("beneficiary1@example.com", "Rahim Uddin", Role.BENEFICIARY, "Sylhet", "01744444444"),
 ]
 
 
-def get_or_create_user(db, email, name, role, location) -> User:
+def get_or_create_user(db, email, name, role, location, phone) -> User:
     user = db.scalar(select(User).where(User.email == email))
     if user is None:
         user = User(
-            email=email, name=name, role=role, location=location,
+            email=email, name=name, role=role, location=location, phone=phone,
             password_hash=hash_password(PASSWORD), is_active=True, is_verified=True,
         )
         db.add(user)
         db.flush()
+    elif user.phone is None:
+        user.phone = phone  # accounts seeded before mobile numbers existed
     return user
 
 
@@ -86,11 +88,15 @@ def main() -> None:
             ngo = NGO(
                 user_id=admin.id, ngo_name="Shobuj Foundation",
                 description="Education and community development across Bangladesh.",
-                address="Mirpur, Dhaka", contact="info@shobuj.test",
+                address="Mirpur, Dhaka", contact="info@shobuj.test", contact_number="01700000002",
+                registration_info="Reg. no. DSS/DHK/2015/1234 (Department of Social Services)",
                 verification_status=VerificationStatus.VERIFIED,
             )
             db.add(ngo)
             db.flush()
+        elif ngo.contact_number is None:
+            ngo.contact_number = "01700000002"
+            ngo.registration_info = "Reg. no. DSS/DHK/2015/1234 (Department of Social Services)"
 
         samples = [
             ("Sylhet Flood Relief", "Sylhet", CampaignStatus.ACTIVE, -10, 20, 50),
@@ -127,6 +133,11 @@ def main() -> None:
                     ngo_id=ngo.id, title=title, location=location, required_skills=skills,
                     interests=interests, availability=days, description=f"{title} with {ngo.ngo_name}.",
                 ))
+        goals = {"Sylhet Flood Relief": (400000, True), "Back to School 2026": (150000, False)}
+        for title, (goal, emergency) in goals.items():
+            c = db.scalar(select(Campaign).where(Campaign.ngo_id == ngo.id, Campaign.title == title))
+            if c is not None and c.donation_goal is None:
+                c.donation_goal, c.is_emergency = goal, emergency
         db.flush()
 
         # Impact + finance demo: a past event with attendance, a received donation, stock and a beneficiary.

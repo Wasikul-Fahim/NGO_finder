@@ -19,6 +19,10 @@ import ManageTasks from "../pages/admin/ManageTasks";
 import ReviewApplications from "../pages/admin/ReviewApplications";
 import ManageCampaigns from "../pages/admin/ManageCampaigns";
 import ManageEvents from "../pages/admin/ManageEvents";
+import Account from "../pages/Account";
+import Certificate from "../pages/Certificate";
+import Events from "../pages/Events";
+import NotificationSettings from "../pages/NotificationSettings";
 import Applications from "../pages/Applications";
 import Campaigns from "../pages/Campaigns";
 import Dashboard from "../pages/Dashboard";
@@ -48,9 +52,13 @@ export default function AppRoutes() {
       <Route path="/register" element={<Register />} />
       <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/opportunities" element={<Opportunities />} />
         <Route path="/campaigns" element={<Campaigns />} />
+        <Route path="/account" element={<Account />} />
+        <Route path="/settings/notifications" element={<NotificationSettings />} />
         <Route element={<RoleRoute roles={["VOLUNTEER"]} />}>
+          <Route path="/opportunities" element={<Opportunities />} />
+          <Route path="/events" element={<Events />} />
+          <Route path="/certificate" element={<Certificate />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/applications" element={<Applications />} />
           <Route path="/tasks" element={<Tasks />} />
@@ -68,6 +76,7 @@ export default function AppRoutes() {
           <Route path="/platform/ngos" element={<PlatformNgos />} />
           <Route path="/platform/users" element={<PlatformUsers />} />
           <Route path="/platform/audit" element={<AuditLog />} />
+          <Route path="/platform/reports" element={<Reports />} />
         </Route>
         <Route element={<RoleRoute roles={["NGO_ADMIN"]} />}>
           <Route path="/admin/announcements" element={<Announcements />} />

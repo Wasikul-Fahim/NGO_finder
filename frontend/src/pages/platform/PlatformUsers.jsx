@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { listUsers, updateUser } from "../../api/admin";
+import { deleteUser, listUsers, updateUser } from "../../api/admin";
 import { parseError } from "../../api/client";
 import { EmptyState, ErrorState, Loading } from "../../components/AsyncState";
 import { inputClass, primaryButton, secondaryButton } from "../../components/FormField";
@@ -27,6 +27,12 @@ export default function PlatformUsers() {
     try { await updateUser(u.id, { is_active: next }); reload(); } catch (err) { setActionError(parseError(err).message); }
   }
 
+  async function remove(u) {
+    if (!window.confirm(`Permanently delete ${u.name}? This only works for accounts with no activity.`)) return;
+    setActionError("");
+    try { await deleteUser(u.id); reload(); } catch (err) { setActionError(parseError(err).message); }
+  }
+
   return (
     <div className="space-y-5">
       <h1 className="font-display text-2xl font-bold text-slate-900">Users</h1>
@@ -45,7 +51,10 @@ export default function PlatformUsers() {
                 <p className="font-bold text-slate-900">{u.name} {!u.is_active && <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold uppercase text-slate-500">Inactive</span>}</p>
                 <p className="truncate text-xs text-slate-500">{u.email} · {u.role.replace("_", " ")}{u.ngo_name ? ` · ${u.ngo_name} (${u.ngo_status.toLowerCase()})` : ""}</p>
               </div>
-              <button className={secondaryButton} disabled={u.id === me.id} title={u.id === me.id ? "You can't deactivate yourself" : undefined} onClick={() => toggle(u)}>{u.is_active ? "Deactivate" : "Reactivate"}</button>
+              <div className="flex gap-2">
+                <button className={secondaryButton} disabled={u.id === me.id} title={u.id === me.id ? "You can't deactivate yourself" : undefined} onClick={() => toggle(u)}>{u.is_active ? "Deactivate" : "Reactivate"}</button>
+                <button className={secondaryButton} disabled={u.id === me.id} onClick={() => remove(u)}>Delete</button>
+              </div>
             </li>
           ))}
         </ul>

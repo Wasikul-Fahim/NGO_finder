@@ -126,9 +126,9 @@ def test_refresh_rotates_and_rejects_reuse(client, db):
     assert db.query(RefreshToken).count() == 2
 
     # Replaying the rotated token fails and burns the whole family.
-    client.cookies.set("refresh_token", old, path="/api/v1/auth")
+    client.cookies.set("refresh_token", old, path="/api")
     assert client.post("/api/v1/auth/refresh").status_code == 401
-    client.cookies.set("refresh_token", new, path="/api/v1/auth")
+    client.cookies.set("refresh_token", new, path="/api")
     assert client.post("/api/v1/auth/refresh").status_code == 401
 
 
@@ -148,7 +148,7 @@ def test_logout_revokes_refresh(client, db):
     client.post("/api/v1/auth/login", json={"email": "a@example.com", "password": PASSWORD})
     token = client.cookies.get("refresh_token")
     assert client.post("/api/v1/auth/logout").status_code == 204
-    client.cookies.set("refresh_token", token, path="/api/v1/auth")
+    client.cookies.set("refresh_token", token, path="/api")
     assert client.post("/api/v1/auth/refresh").status_code == 401
 
 

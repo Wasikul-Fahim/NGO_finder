@@ -15,11 +15,11 @@ function MatchBadge({ match }) {
 }
 
 function OpportunityCard({ opportunity: o, match, applied, canApply }) {
-  const [state, setState] = useState({ busy: false, error: "", done: applied });
+  const [state, setState] = useState({ busy: false, error: "", done: applied, needsPhone: false });
   async function apply() {
     setState({ busy: true, error: "", done: false });
     try { await applyTo(o.id); setState({ busy: false, error: "", done: true }); }
-    catch (err) { const e = parseError(err); setState({ busy: false, error: e.message, done: e.status === 409 }); }
+    catch (err) { const e = parseError(err); setState({ busy: false, error: e.message, needsPhone: !!e.fields.phone, done: e.status === 409 && !e.fields.phone }); }
   }
   return (
     <article className="surface-card p-5">
@@ -39,7 +39,7 @@ function OpportunityCard({ opportunity: o, match, applied, canApply }) {
           <button className={state.done ? secondaryButton : primaryButton} disabled={state.busy || state.done} onClick={apply}>
             {state.done ? "Applied ✓" : state.busy ? "Applying…" : "Apply"}
           </button>
-          {state.error && <span role="alert" className="text-xs font-semibold text-rose-600">{state.error}</span>}
+          {state.error && <span role="alert" className="text-xs font-semibold text-rose-600">{state.error}{state.needsPhone && <> <Link className="underline" to="/profile">Add it now</Link></>}</span>}
         </div>
       )}
     </article>

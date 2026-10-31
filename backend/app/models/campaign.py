@@ -1,6 +1,20 @@
 from datetime import date, time
+from decimal import Decimal
 
-from sqlalchemy import JSON, CheckConstraint, Date, ForeignKey, Integer, String, Text, Time
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    Date,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    Time,
+    UniqueConstraint,
+    false,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, enum_column
@@ -24,6 +38,8 @@ class Campaign(TimestampMixin, Base):
     status: Mapped[CampaignStatus] = enum_column(CampaignStatus, default=CampaignStatus.DRAFT, index=True)
     required_volunteers: Mapped[int] = mapped_column(Integer, default=0)
     required_resources: Mapped[list] = mapped_column(JSON, default=list)
+    donation_goal: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    is_emergency: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), index=True)
 
     ngo: Mapped[NGO] = relationship(back_populates="campaigns")
     events: Mapped[list["Event"]] = relationship(back_populates="campaign", cascade="all, delete-orphan")
@@ -40,3 +56,17 @@ class Event(TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(Text)
 
     campaign: Mapped[Campaign] = relationship(back_populates="events")
+
+
+class EventAssignment(TimestampMixin, Base):
+    """A volunteer planned to attend an event, assigned by the NGO or joined by the volunteer."""
+
+    __tablename__ = "event_assignments"
+    __table_args__ = (UniqueConstraint("event_id", "volunteer_id", name="uq_event_assignment"),)
+
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), index=True)
+    volunteer_id: Mapped[int] = mapped_column(ForeignKey("volunteers.id", ondelete="CASCADE"), index=True)
+    assigned_by: Mapped[str] = mapped_column(String(10), default="NGO")  # "NGO" or "SELF"
+
+    event: Mapped[Event] = relationship()
+    volunteer: Mapped["Volunteer"] = relationship()  # noqa: F821

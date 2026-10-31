@@ -1,6 +1,6 @@
 from app.models.audit import AuditLog
 from app.models.base import Base
-from app.models.campaign import Campaign, Event
+from app.models.campaign import Campaign, Event, EventAssignment
 from app.models.enums import (
     PUBLIC_ROLES,
     ApplicationStatus,
@@ -38,6 +38,7 @@ __all__ = [
     "DonationStatus",
     "DonationType",
     "Event",
+    "EventAssignment",
     "Notification",
     "NotificationPriority",
     "NotificationStatus",

@@ -19,12 +19,13 @@ const NEXT_ACTIONS = {
   COMPLETED: [],
   ARCHIVED: [],
 };
-const EMPTY = { title: "", description: "", location: "", start_date: "", end_date: "", required_volunteers: 0 };
+const EMPTY = { title: "", description: "", location: "", start_date: "", end_date: "", required_volunteers: 0, donation_goal: "", is_emergency: false, publish: false };
 
 function CampaignForm({ initial, onSaved, onCancel }) {
   const [form, setForm] = useState(initial ? {
     title: initial.title, description: initial.description ?? "", location: initial.location ?? "",
     start_date: initial.start_date, end_date: initial.end_date, required_volunteers: initial.required_volunteers,
+    donation_goal: initial.donation_goal ?? "", is_emergency: initial.is_emergency, publish: false,
   } : EMPTY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState({ message: "", fields: {} });
@@ -34,9 +35,12 @@ function CampaignForm({ initial, onSaved, onCancel }) {
     e.preventDefault();
     setSaving(true);
     setError({ message: "", fields: {} });
+    const { publish, ...rest } = form;
     const body = {
-      ...form, description: form.description || null, location: form.location || null,
+      ...rest, description: form.description || null, location: form.location || null,
       required_volunteers: Number(form.required_volunteers) || 0,
+      donation_goal: form.donation_goal === "" ? null : Number(form.donation_goal),
+      ...(initial ? {} : { status: publish ? "ACTIVE" : "DRAFT" }),
     };
     try {
       await (initial ? updateCampaign(initial.id, body) : createCampaign(body));
@@ -60,6 +64,9 @@ function CampaignForm({ initial, onSaved, onCancel }) {
         <FormField label="Start date" error={error.fields.start_date}><input className={inputClass} type="date" value={form.start_date} onChange={set("start_date")} required /></FormField>
         <FormField label="End date" error={error.fields.end_date}><input className={inputClass} type="date" value={form.end_date} onChange={set("end_date")} required /></FormField>
       </div>
+      <FormField label="Donation goal (৳, optional)" error={error.fields.donation_goal}><input className={inputClass} type="number" min="0" step="0.01" value={form.donation_goal} onChange={set("donation_goal")} /></FormField>
+      <label className="flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={form.is_emergency} onChange={(e) => setForm((f) => ({ ...f, is_emergency: e.target.checked }))} /> Emergency relief campaign (shown first, with an emergency badge)</label>
+      {!initial && <label className="flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={form.publish} onChange={(e) => setForm((f) => ({ ...f, publish: e.target.checked }))} /> Publish immediately (otherwise it is saved as a draft)</label>}
       <div className="flex gap-3">
         <button className={primaryButton} disabled={saving}>{saving ? "Saving…" : "Save campaign"}</button>
         <button type="button" className={secondaryButton} onClick={onCancel}>Cancel</button>
@@ -105,6 +112,7 @@ export default function ManageCampaigns() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h3 className="truncate font-display text-base font-bold text-slate-900">{c.title}</h3>
+                  {c.is_emergency && <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-extrabold uppercase text-rose-600">Emergency</span>}
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${STATUS_STYLE[c.status]}`}>{c.status}</span>
                 </div>
                 <p className="mt-1 text-xs text-slate-500">{c.location || "Anywhere"} · {c.start_date} → {c.end_date} · {c.required_volunteers} volunteers</p>

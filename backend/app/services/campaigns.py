@@ -1,8 +1,16 @@
-from sqlalchemy import Select, or_, select
+from sqlalchemy import Select, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError, forbidden, not_found
-from app.models import Campaign, CampaignStatus, Role, User
+from app.models import (
+    Campaign,
+    CampaignStatus,
+    Donation,
+    DonationStatus,
+    DonationType,
+    Role,
+    User,
+)
 from app.models.user import NGO
 
 PUBLIC_STATUSES = (CampaignStatus.ACTIVE, CampaignStatus.COMPLETED)
@@ -54,3 +62,15 @@ def ensure_transition(current: CampaignStatus, target: CampaignStatus) -> None:
         raise AppError(
             409, "INVALID_TRANSITION", f"Cannot move a campaign from {current.value} to {target.value}."
         )
+
+
+def received_by_campaign(db: Session, campaign_ids: list[int]) -> dict[int, float]:
+    """Confirmed money donations per campaign (what the donation-progress bar is based on)."""
+    if not campaign_ids:
+        return {}
+    rows = db.execute(
+        select(Donation.campaign_id, func.coalesce(func.sum(Donation.amount), 0))
+        .where(Donation.campaign_id.in_(campaign_ids), Donation.status == DonationStatus.RECEIVED,
+               Donation.donation_type == DonationType.MONEY)
+        .group_by(Donation.campaign_id))
+    return {cid: float(total) for cid, total in rows}

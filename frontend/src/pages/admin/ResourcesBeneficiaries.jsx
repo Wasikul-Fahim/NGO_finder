@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { listCampaigns } from "../../api/campaigns";
 import { parseError } from "../../api/client";
-import { addResource, distribute, enrollBeneficiary, listBeneficiaries, listResources, setSupportStatus } from "../../api/impact";
+import { addResource, deleteResource, distribute, enrollBeneficiary, listBeneficiaries, listResources, setSupportStatus } from "../../api/impact";
 import { EmptyState, ErrorState, Loading } from "../../components/AsyncState";
 import { StatusPill } from "../../components/Chips";
 import FormField, { inputClass, primaryButton, secondaryButton } from "../../components/FormField";
@@ -34,7 +34,7 @@ function Resources({ campaign, beneficiaries }) {
         <ul className="space-y-2">
           {resources.data.map((r) => (
             <li key={r.id} className="surface-card space-y-2 p-4">
-              <div className="flex justify-between text-sm font-bold text-slate-900"><span>{r.name}</span><span>{r.quantity_allocated} / {r.quantity_total} {r.unit} given out · {r.quantity_remaining} left</span></div>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-bold text-slate-900"><span>{r.name}</span><span className="flex items-center gap-3">{r.quantity_allocated} / {r.quantity_total} {r.unit} given out · {r.quantity_remaining} left{r.quantity_allocated === 0 && <button className="text-xs font-bold text-rose-600" onClick={() => window.confirm(`Delete "${r.name}"?`) && run(() => deleteResource(r.id), "Resource deleted.")}>Delete</button>}</span></div>
               <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${r.quantity_total ? (r.quantity_allocated / r.quantity_total) * 100 : 0}%` }} /></div>
               {beneficiaries.length > 0 && r.quantity_remaining > 0 && (
                 <form className="flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); const d = dist[r.id] || {}; run(async () => { await distribute(r.id, { beneficiary_id: Number(d.beneficiary_id), quantity: Number(d.quantity) }); setDist({ ...dist, [r.id]: {} }); }, "Distribution recorded."); }}>

@@ -19,6 +19,17 @@ class NotificationOut(BaseModel):
     created_at: datetime
 
 
+class NotificationSettings(BaseModel):
+    """Types the user wants silenced. High-priority alerts and emergency alerts always get through."""
+
+    muted_types: list[NotificationType] = Field(default_factory=list)
+
+    @field_validator("muted_types")
+    @classmethod
+    def _unique(cls, v: list[NotificationType]) -> list[NotificationType]:
+        return list(dict.fromkeys(v))
+
+
 class UnreadCount(BaseModel):
     unread: int
     high_priority_unread: int

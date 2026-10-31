@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     refresh_cookie_secure: bool = False
     refresh_cookie_samesite: str = "lax"
 
+    upload_dir: str = ""  # defaults to <backend>/uploads
+    max_logo_bytes: int = 2 * 1024 * 1024
+
     # Brute-force protection for /auth/login (failed attempts per window).
     login_max_attempts: int = 5
     login_window_seconds: int = 300
@@ -29,6 +32,10 @@ class Settings(BaseSettings):
     matching_interest_weight: float = 0.20
     matching_location_weight: float = 0.20
     matching_availability_weight: float = 0.15
+
+    @property
+    def upload_path(self) -> Path:
+        return Path(self.upload_dir) if self.upload_dir else BACKEND_DIR / "uploads"
 
     @property
     def cors_origin_list(self) -> list[str]:

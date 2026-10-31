@@ -286,6 +286,23 @@ Acceptance criteria
   message was sent, not its content.
 - Tests: `test_ngo_onboarding.py` (15 tests).
 
+### Alignment with the project report (added after reading `CSE314_Report_Overleaf.pdf`)
+Full endpoint-by-endpoint mapping, with every deliberate difference, is in `docs/API_REFERENCE.md`. Summary of what was added:
+- **Mobile number:** collected at signup, editable on the volunteer profile and My Account, validated (7-15 digits);
+  a volunteer cannot apply until it is set (409 `PROFILE_INCOMPLETE`) because NGOs contact applicants through it.
+- **NGO registration details:** contact number, registration information, validated logo upload (PNG/JPG/WEBP, 2 MB,
+  checked by content), admin remarks on verification; `PUT/DELETE /ngos/{id}` (delete refused when the NGO has records).
+- **Volunteer API:** `POST/GET/PUT/DELETE /volunteers[/{id}]`, contributions review for NGOs, `GET/PUT /users/profile`.
+- **Report paths:** every route also answers under `/api/...` (not only `/api/v1/...`); `PUT` accepted wherever the report says it;
+  `POST /applications`, `PATCH /applications/{id}/status`, `GET /matching/opportunities`, `/participations`, top-level
+  `/resources` and `/beneficiaries`, role-aware `GET /tasks` and `GET /donations`, `PUT /donations/{id}`, `POST /notifications`.
+- **Campaigns:** donation goal with progress bar, emergency flag (sorted first), create as draft or active.
+- **Events:** NGOs assign volunteers to an event roster; volunteers can view upcoming events, join and leave.
+- **Volunteer screens:** a real dashboard (replacing the demo numbers), Events page, impact page with people reached and
+  NGOs supported, printable volunteer certificate, notification settings, My Account menu.
+- **Admin:** delete accounts with no history, `/admin/reports` bundle, campaign and resource-utilization reports.
+- **Operations:** `scripts/backup_local.py` (backup and `--restore`) for the report's backup and recovery requirement.
+
 ### Verification notes (SCRUM-9, 10 and 11)
 - Verified: full backend suite, `ruff`, Alembic 0004 upgrade/downgrade/check on SQLite, seed run twice,
   `npm run build`, and a run against a real uvicorn server: a bad WebSocket token was refused, an emergency alert

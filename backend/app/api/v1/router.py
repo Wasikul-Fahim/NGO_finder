@@ -19,6 +19,7 @@ from app.api.v1 import (
     tasks,
     volunteers,
 )
+from app.schemas.opportunity import RecommendedOut
 
 api_router = APIRouter()
 
@@ -30,11 +31,16 @@ def health(db: DbSession):
 
 
 api_router.include_router(auth.router)
+api_router.include_router(auth.users_router)
 api_router.include_router(ngos.router)
 api_router.include_router(campaigns.router)
 api_router.include_router(events.router)
 api_router.include_router(volunteers.router)
 api_router.include_router(opportunities.router)
+api_router.add_api_route(
+    "/matching/opportunities", opportunities.recommended, methods=["GET"], tags=["matching"],
+    response_model=list[RecommendedOut],
+)
 api_router.include_router(applications.router)
 api_router.include_router(tasks.router)
 api_router.include_router(participation.router)

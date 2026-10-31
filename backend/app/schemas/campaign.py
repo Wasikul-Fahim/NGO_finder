@@ -1,5 +1,6 @@
 from datetime import date, datetime, time
-from typing import Self
+from decimal import Decimal
+from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -28,6 +29,8 @@ class CampaignBase(BaseModel):
     end_date: date
     required_volunteers: int = Field(default=0, ge=0, le=100000)
     required_resources: list[ResourceNeed] = Field(default_factory=list, max_length=50)
+    donation_goal: Decimal | None = Field(default=None, ge=0, le=Decimal(1000000000), decimal_places=2)
+    is_emergency: bool = False
 
     _title = field_validator("title")(_strip_required)
 
@@ -39,7 +42,8 @@ class CampaignBase(BaseModel):
 
 
 class CampaignCreate(CampaignBase):
-    pass
+    # A new campaign may be saved as a draft or published straight away.
+    status: Literal["DRAFT", "ACTIVE"] = "DRAFT"
 
 
 class CampaignUpdate(BaseModel):
@@ -52,6 +56,8 @@ class CampaignUpdate(BaseModel):
     end_date: date | None = None
     required_volunteers: int | None = Field(default=None, ge=0, le=100000)
     required_resources: list[ResourceNeed] | None = Field(default=None, max_length=50)
+    donation_goal: Decimal | None = Field(default=None, ge=0, le=Decimal(1000000000), decimal_places=2)
+    is_emergency: bool | None = None
 
     _title = field_validator("title")(_strip_required)
 
@@ -74,6 +80,10 @@ class CampaignOut(BaseModel):
     status: CampaignStatus
     required_volunteers: int
     required_resources: list[ResourceNeed]
+    donation_goal: float | None = None
+    donations_received: float = 0
+    donation_progress: float | None = None  # percent of the goal received, when a goal is set
+    is_emergency: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -104,6 +114,16 @@ class EventUpdate(BaseModel):
     _name = field_validator("event_name")(_strip_required)
 
 
+class AssignmentOut(BaseModel):
+    volunteer_id: int
+    volunteer_name: str
+    assigned_by: str
+
+
+class AssignmentCreate(BaseModel):
+    volunteer_id: int
+
+
 class EventOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -116,3 +136,4 @@ class EventOut(BaseModel):
     location: str | None
     description: str | None
     created_at: datetime
+    joined: bool = False  # the signed-in volunteer is assigned to / has joined this event

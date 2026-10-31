@@ -16,6 +16,7 @@ from app.schemas.notification import (
     AnnouncementCreate,
     AnnouncementResult,
     NotificationOut,
+    NotificationSettings,
     UnreadCount,
 )
 from app.services import campaigns as campaign_svc
@@ -41,6 +42,18 @@ def list_notifications(
         stmt = stmt.where(Notification.notification_type == notification_type)
     return paginate(db, stmt.order_by(Notification.created_at.desc(), Notification.id.desc()), params,
                     NotificationOut.model_validate)
+
+
+@router.get("/notifications/settings", response_model=NotificationSettings)
+def get_settings(user: CurrentUser):
+    return NotificationSettings(muted_types=(user.notification_prefs or {}).get("muted_types", []))
+
+
+@router.put("/notifications/settings", response_model=NotificationSettings)
+def update_settings(data: NotificationSettings, user: CurrentUser, db: DbSession):
+    user.notification_prefs = {**(user.notification_prefs or {}), "muted_types": [t.value for t in data.muted_types]}
+    db.commit()
+    return data
 
 
 @router.get("/notifications/unread-count", response_model=UnreadCount)
@@ -72,6 +85,7 @@ def mark_read(notification_id: int, user: CurrentUser, db: DbSession):
 
 
 @router.post("/announcements", response_model=AnnouncementResult, status_code=201)
+@router.post("/notifications", response_model=AnnouncementResult, status_code=201)
 def announce(data: AnnouncementCreate, ngo: VerifiedNgo, user: CurrentUser, db: DbSession):
     """Message the volunteers and/or donors connected to this NGO. HIGH priority = emergency alert."""
     if data.campaign_id is not None:

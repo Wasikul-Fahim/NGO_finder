@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
+import api from "../api/client";
 import * as authApi from "../api/auth";
 import { setAccessToken, setAuthLostHandler } from "../api/client";
 
@@ -44,9 +45,14 @@ export function AuthProvider({ children }) {
     applySession(null);
   }, [applySession]);
 
+  const refreshUser = useCallback(async () => {
+    const { data } = await api.get("/api/v1/auth/me");
+    setUser(data);
+  }, []);
+
   const value = useMemo(
-    () => ({ user, isLoading, isAuthenticated: !!user, login, logout, register: authApi.register, registerNgo: authApi.registerNgo }),
-    [user, isLoading, login, logout],
+    () => ({ user, isLoading, isAuthenticated: !!user, login, logout, refreshUser, register: authApi.register, registerNgo: authApi.registerNgo }),
+    [user, isLoading, login, logout, refreshUser],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

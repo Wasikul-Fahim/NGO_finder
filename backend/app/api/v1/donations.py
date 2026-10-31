@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
 
-from app.api.deps import CurrentNgo, CurrentUser, DbSession, VerifiedNgo, require_roles
+from app.api.deps import CurrentUser, DbSession, VerifiedNgo, require_roles
 from app.core.errors import AppError, forbidden, not_found
 from app.models import (
     Campaign,
@@ -24,12 +24,13 @@ from app.schemas.finance import (
     DonationCreate,
     DonationOut,
     DonationStatusChange,
+    DonationUpdate,
     ResourceOut,
     UtilizationOut,
 )
 from app.services.audit import log_action
 from app.services.campaigns import user_ngo_id
-from app.services.notifications import notify
+from app.services.notifications import dedupe_hash, notify
 from app.services.pagination import PageParams, paginate
 
 router = APIRouter(tags=["donations"])
@@ -95,12 +96,19 @@ def my_donations(
 
 
 @router.get("/donations", response_model=Page[DonationOut])
-def ngo_donations(
-    ngo: CurrentNgo, db: DbSession, params: Annotated[PageParams, Depends()],
+def list_donations(
+    user: CurrentUser, db: DbSession, params: Annotated[PageParams, Depends()],
     status: DonationStatus | None = None, campaign_id: int | None = None,
     donation_type: DonationType | None = None,
 ):
-    stmt = _base().where(Donation.ngo_id == ngo.id)
+    """Role-aware: donors get their own, NGO admins their NGO's, platform admins everything."""
+    stmt = _base()
+    if user.role == Role.DONOR:
+        stmt = stmt.where(Donation.donor_id == user.id)
+    elif user.role == Role.NGO_ADMIN:
+        stmt = stmt.where(Donation.ngo_id == user_ngo_id(db, user))
+    elif user.role != Role.PLATFORM_ADMIN:
+        raise forbidden("Donation records are available to donors and admins.")
     if status:
         stmt = stmt.where(Donation.status == status)
     if campaign_id:
@@ -108,6 +116,42 @@ def ngo_donations(
     if donation_type:
         stmt = stmt.where(Donation.donation_type == donation_type)
     return paginate(db, stmt.order_by(Donation.created_at.desc(), Donation.id.desc()), params, to_out)
+
+
+@router.patch("/donations/{donation_id}", response_model=DonationOut)
+@router.put("/donations/{donation_id}", response_model=DonationOut)
+def update_donation(donation_id: int, data: DonationUpdate, ngo: VerifiedNgo, user: CurrentUser, db: DbSession):
+    d = db.scalar(_base().where(Donation.id == donation_id))
+    if d is None:
+        raise not_found("Donation")
+    if d.ngo_id != ngo.id:
+        raise forbidden("This donation belongs to another NGO.")
+    if d.status == DonationStatus.REJECTED:
+        raise AppError(409, "CONFLICT", "A rejected donation can no longer be edited.")
+    changes = data.model_dump(exclude_unset=True)
+    if "amount" in changes and changes["amount"] is None:
+        raise AppError(422, "VALIDATION_ERROR", "Please correct the highlighted fields.",
+                       {"amount": "This field cannot be empty."})
+    if changes.get("donation_type", None) is None and "donation_type" in changes:
+        raise AppError(422, "VALIDATION_ERROR", "Please correct the highlighted fields.",
+                       {"donation_type": "This field cannot be empty."})
+    new_type = changes.get("donation_type", d.donation_type)
+    new_amount = changes.get("amount", d.amount)
+    if new_type == DonationType.MONEY and new_amount <= 0:
+        raise AppError(422, "VALIDATION_ERROR", "Please correct the highlighted fields.",
+                       {"amount": "Enter an amount greater than zero."})
+    before = {k: (float(getattr(d, k)) if k == "amount" else getattr(d, k)) for k in changes}
+    before = {k: getattr(v, "value", v) for k, v in before.items()}
+    for field, value in changes.items():
+        setattr(d, field, value)
+    after = {k: (float(v) if k == "amount" else getattr(v, "value", v)) for k, v in changes.items()}
+    log_action(db, user, "UPDATE_DONATION", "Donation", d.id, {"before": before, "after": after})
+    notify(db, [d.donor_id], title="Donation details updated",
+           message="The NGO corrected the details of one of your donations. Check your donation history.",
+           type=NotificationType.DONATION_UPDATE, link="/donations",
+           dedupe_key=f"donation-edit:{d.id}:{dedupe_hash(before, after)}")
+    db.commit()
+    return to_out(d)
 
 
 @router.patch("/donations/{donation_id}/status", response_model=DonationOut)

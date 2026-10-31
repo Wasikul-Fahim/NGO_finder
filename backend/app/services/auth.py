@@ -72,7 +72,8 @@ def register_ngo(db: Session, data: NgoRegisterRequest) -> User:
         raise _duplicate_email() from None
     ngo = NGO(
         user_id=user.id, ngo_name=data.ngo_name, description=data.description, address=data.address,
-        contact=data.contact, verification_status=VerificationStatus.PENDING,
+        contact=data.contact, contact_number=data.contact_number or data.phone,
+        registration_info=data.registration_info, verification_status=VerificationStatus.PENDING,
     )
     db.add(ngo)
     db.flush()

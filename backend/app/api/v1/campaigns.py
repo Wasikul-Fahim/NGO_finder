@@ -23,11 +23,14 @@ from app.services.pagination import PageParams, paginate
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
 
-def to_out(c: Campaign) -> CampaignOut:
+def to_out(c: Campaign, received: float = 0.0) -> CampaignOut:
+    goal = float(c.donation_goal) if c.donation_goal is not None else None
     return CampaignOut(
         id=c.id, ngo_id=c.ngo_id, ngo_name=c.ngo.ngo_name, title=c.title, description=c.description,
         location=c.location, start_date=c.start_date, end_date=c.end_date, status=c.status,
         required_volunteers=c.required_volunteers, required_resources=c.required_resources or [],
+        donation_goal=goal, donations_received=received, is_emergency=bool(c.is_emergency),
+        donation_progress=round(min(received / goal * 100, 100), 1) if goal else None,
         created_at=c.created_at, updated_at=c.updated_at,
     )
 
@@ -42,6 +45,7 @@ def list_campaigns(
     location: Annotated[str | None, Query(max_length=120)] = None,
     ngo_id: int | None = None,
     mine: bool = False,
+    emergency: bool | None = None,
 ):
     stmt = select(Campaign).options(joinedload(Campaign.ngo))
     stmt = svc.restrict_visible(stmt, db, user)
@@ -59,31 +63,42 @@ def list_campaigns(
         stmt = stmt.where(Campaign.location.ilike(f"%{location.strip()}%"))
     if ngo_id:
         stmt = stmt.where(Campaign.ngo_id == ngo_id)
-    stmt = stmt.order_by(Campaign.start_date.desc(), Campaign.id.desc())
-    return paginate(db, stmt, params, to_out)
+    if emergency is not None:
+        stmt = stmt.where(Campaign.is_emergency.is_(emergency))
+    stmt = stmt.order_by(Campaign.is_emergency.desc(), Campaign.start_date.desc(), Campaign.id.desc())
+    page = paginate(db, stmt, params)  # ORM rows; converted below with their donation totals
+    received = svc.received_by_campaign(db, [c.id for c in page["items"]])
+    page["items"] = [to_out(c, received.get(c.id, 0.0)) for c in page["items"]]
+    return page
+
+
+def _out(db, campaign: Campaign) -> CampaignOut:
+    return to_out(campaign, svc.received_by_campaign(db, [campaign.id]).get(campaign.id, 0.0))
 
 
 @router.get("/{campaign_id}", response_model=CampaignOut)
 def get_campaign(campaign_id: int, user: OptionalUser, db: DbSession):
-    return to_out(svc.get_visible_campaign(db, campaign_id, user))
+    return _out(db, svc.get_visible_campaign(db, campaign_id, user))
 
 
 @router.post("", response_model=CampaignOut, status_code=201)
 def create_campaign(data: CampaignCreate, ngo: VerifiedNgo, user: CurrentUser, db: DbSession):
     campaign = Campaign(
         ngo_id=ngo.id,
-        status=CampaignStatus.DRAFT,
-        **data.model_dump(exclude={"required_resources"}),
+        status=CampaignStatus(data.status),
+        **data.model_dump(exclude={"required_resources", "status"}),
         required_resources=[r.model_dump() for r in data.required_resources],
     )
     db.add(campaign)
     db.flush()
-    log_action(db, user, "CREATE_CAMPAIGN", "Campaign", campaign.id, {"title": campaign.title})
+    log_action(db, user, "CREATE_CAMPAIGN", "Campaign", campaign.id,
+               {"title": campaign.title, "status": campaign.status.value})
     db.commit()
-    return to_out(campaign)
+    return _out(db, campaign)
 
 
 @router.patch("/{campaign_id}", response_model=CampaignOut)
+@router.put("/{campaign_id}", response_model=CampaignOut)
 def update_campaign(
     campaign_id: int, data: CampaignUpdate, ngo: VerifiedNgo, user: CurrentUser, db: DbSession
 ):
@@ -91,7 +106,8 @@ def update_campaign(
     if campaign.status in svc.LOCKED_STATUSES:
         raise conflict(f"A {campaign.status.value.lower()} campaign can no longer be edited.")
     changes = data.model_dump(exclude_unset=True)
-    for required in ("title", "start_date", "end_date", "required_volunteers", "required_resources"):
+    for required in ("title", "start_date", "end_date", "required_volunteers", "required_resources",
+                     "is_emergency"):
         if required in changes and changes[required] is None:
             raise AppError(422, "VALIDATION_ERROR", "Please correct the highlighted fields.",
                            {required: "This field cannot be empty."})
@@ -106,7 +122,7 @@ def update_campaign(
         setattr(campaign, field, value)
     log_action(db, user, "UPDATE_CAMPAIGN", "Campaign", campaign.id, {"fields": sorted(changes)})
     db.commit()
-    return to_out(campaign)
+    return _out(db, campaign)
 
 
 @router.post("/{campaign_id}/status", response_model=CampaignOut)
@@ -127,7 +143,7 @@ def change_status(
            type=NotificationType.CAMPAIGN_UPDATE, link="/campaigns",
            dedupe_key=f"campaign:{campaign.id}:{data.status.value}")
     db.commit()
-    return to_out(campaign)
+    return _out(db, campaign)
 
 
 @router.delete("/{campaign_id}", response_model=CampaignOut)
@@ -141,4 +157,4 @@ def archive_campaign(campaign_id: int, ngo: VerifiedNgo, user: CurrentUser, db: 
         db, user, "ARCHIVE_CAMPAIGN", "Campaign", campaign.id, {"from": previous.value}
     )
     db.commit()
-    return to_out(campaign)
+    return _out(db, campaign)

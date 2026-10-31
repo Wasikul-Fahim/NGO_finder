@@ -11,6 +11,7 @@ from pydantic import (
 )
 
 from app.models.enums import ApplicationStatus, TaskStatus
+from app.schemas.auth import normalize_phone
 
 DAYS = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
 
@@ -59,11 +60,20 @@ class VolunteerOut(BaseModel):
 
     id: int
     name: str
+    phone: str | None = None
     location: str | None
     skills: list[str]
     interests: list[str]
     availability: list[str]
     experience: str | None
+    # A complete profile has a mobile number, a city and at least one skill.
+    profile_complete: bool = False
+
+
+class VolunteerDirectoryOut(VolunteerOut):
+    """What an NGO (that the volunteer applied to) or a platform admin may see."""
+
+    email: str | None = None
 
 
 class VolunteerUpdate(BaseModel):
@@ -74,6 +84,9 @@ class VolunteerUpdate(BaseModel):
     availability: Days | None = None
     experience: str | None = Field(default=None, max_length=5000)
     location: str | None = Field(default=None, max_length=120)
+    phone: str | None = Field(default=None, max_length=30)
+
+    _phone = field_validator("phone")(normalize_phone)
 
 
 # ---- opportunities -----------------------------------------------------
@@ -157,6 +170,10 @@ class ApplicationOut(BaseModel):
     status: ApplicationStatus
     application_date: datetime
     review_note: str | None
+
+
+class ApplicationCreate(BaseModel):
+    opportunity_id: int
 
 
 class ApplicationMessage(BaseModel):

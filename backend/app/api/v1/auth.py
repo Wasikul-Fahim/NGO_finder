@@ -22,7 +22,7 @@ from app.services.rate_limit import login_limiter
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 REFRESH_COOKIE = "refresh_token"
-COOKIE_PATH = "/api/v1/auth"
+COOKIE_PATH = "/api"  # covers both /api/v1/auth/* and the /api/auth/* alias
 
 
 def _set_refresh_cookie(response: Response, token: str) -> None:
@@ -143,3 +143,20 @@ def change_password(data: ChangePasswordRequest, user: CurrentUser, db: DbSessio
     _clear_refresh_cookie(response)
     response.status_code = 204
     return response
+
+
+# The report documents profile management under /users/profile; same behaviour as /auth/me.
+users_router = APIRouter(prefix="/users", tags=["users"])
+
+
+@users_router.get("/profile", response_model=UserOut)
+def get_profile(user: CurrentUser):
+    return user
+
+
+@users_router.put("/profile/update", response_model=UserOut)
+@users_router.patch("/profile/update", response_model=UserOut)
+@users_router.put("/profile", response_model=UserOut)
+@users_router.patch("/profile", response_model=UserOut)
+def update_profile(data: UpdateProfileRequest, user: CurrentUser, db: DbSession):
+    return update_me(data, user, db)

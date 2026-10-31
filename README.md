@@ -56,4 +56,9 @@ Re-running `setup_local.py` is safe (it never duplicates data). To start fresh, 
 
 **Tests:** `cd backend && ../.venv/bin/python -m pytest app/tests -q` (Windows: `..\.venv\Scripts\python -m pytest app\tests -q`).
 
-Task list: `docs/SCRUM_TASKS.md`.
+Task list: `docs/SCRUM_TASKS.md`. API reference (maps the report's endpoints to the running API): `docs/API_REFERENCE.md`.
+
+**Backups:** `python scripts/backup_local.py` copies the database and uploaded logos to `backend/backups/<time>/`;
+`python scripts/backup_local.py --restore backend/backups/<time>` puts them back (stop the API first).
+
+**Volunteers:** add your mobile number on *My Profile* (or at signup) - NGOs use it to contact you and you need it to apply.

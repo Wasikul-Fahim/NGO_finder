@@ -18,7 +18,7 @@ export default function Register() {
   const navigate = useNavigate();
   const [form, setForm] = useState({
     name: "", email: "", password: "", confirm_password: "", role: "VOLUNTEER", location: "",
-    ngo_name: "", description: "", address: "", contact: "",
+    ngo_name: "", description: "", address: "", contact: "", contact_number: "", registration_info: "", phone: "",
   });
   const [error, setError] = useState({ message: "", fields: {} });
   const [submitting, setSubmitting] = useState(false);
@@ -35,9 +35,9 @@ export default function Register() {
     }
     setSubmitting(true);
     try {
-      const base = { name: form.name, email: form.email, password: form.password, confirm_password: form.confirm_password, location: form.location.trim() || null };
+      const base = { name: form.name, email: form.email, password: form.password, confirm_password: form.confirm_password, location: form.location.trim() || null, phone: form.phone.trim() || null };
       if (isNgo) {
-        await registerNgo({ ...base, ngo_name: form.ngo_name, description: form.description.trim() || null, address: form.address.trim() || null, contact: form.contact.trim() || null });
+        await registerNgo({ ...base, ngo_name: form.ngo_name, description: form.description.trim() || null, address: form.address.trim() || null, contact: form.contact.trim() || null, contact_number: form.contact_number.trim() || null, registration_info: form.registration_info.trim() || null });
       } else {
         await register({ ...base, role: form.role });
       }
@@ -76,8 +76,13 @@ export default function Register() {
             </FormField>
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField label="Address" error={error.fields.address}><input className={inputClass} value={form.address} onChange={set("address")} /></FormField>
-              <FormField label="Public contact (email / phone)" error={error.fields.contact}><input className={inputClass} value={form.contact} onChange={set("contact")} /></FormField>
+              <FormField label="Public contact email" error={error.fields.contact}><input className={inputClass} type="email" value={form.contact} onChange={set("contact")} /></FormField>
+              <FormField label="Contact number" error={error.fields.contact_number}><input className={inputClass} type="tel" placeholder="01712345678" value={form.contact_number} onChange={set("contact_number")} /></FormField>
             </div>
+            <FormField label="Registration information" error={error.fields.registration_info}>
+              <textarea className={textareaClass} rows={2} placeholder="Registration / licence number and issuing body" value={form.registration_info} onChange={set("registration_info")} />
+            </FormField>
+            <p className="text-[11px] text-slate-400">You can add your logo from the organisation profile after signing up.</p>
           </>
         )}
         <FormField label={isNgo ? "Your full name" : "Full name"} error={error.fields.name}>
@@ -85,6 +90,10 @@ export default function Register() {
         </FormField>
         <FormField label="Email" error={error.fields.email}>
           <input className={inputClass} type="email" autoComplete="email" required value={form.email} onChange={set("email")} />
+        </FormField>
+        <FormField label={isNgo ? "Your mobile number" : "Mobile number"} error={error.fields.phone}>
+          <input className={inputClass} type="tel" autoComplete="tel" placeholder="01712345678" value={form.phone} onChange={set("phone")} />
+          {form.role === "VOLUNTEER" && <span className="mt-1 block text-[11px] text-slate-400">NGOs use this to reach you. Required before you can apply to an opportunity.</span>}
         </FormField>
         <FormField label={isNgo ? "City (e.g. Dhaka, Dhaka)" : "Location (City, Region)"} error={error.fields.location}>
           <input className={inputClass} autoComplete="address-level2" value={form.location} onChange={set("location")} />

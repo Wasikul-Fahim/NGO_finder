@@ -6,6 +6,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import joinedload
 
 from app.api.deps import DbSession, require_roles
+from app.api.v1 import reports as r
 from app.core.errors import AppError, conflict, not_found
 from app.core.security import hash_password
 from app.models import (
@@ -23,6 +24,7 @@ from app.models import (
     User,
     VerificationStatus,
 )
+from app.models.base import utcnow
 from app.schemas.admin import (
     AdminUserOut,
     AdminUserUpdate,
@@ -171,6 +173,52 @@ def create_ngo_admin(data: NgoAdminCreate, admin: PlatformAdmin, db: DbSession):
                {"user_id": user.id, "ngo_name": ngo.ngo_name, "verified": data.verified})
     db.commit()
     return user_out(user)
+
+
+@router.delete("/users/{user_id}")
+def delete_user(user_id: int, admin: PlatformAdmin, db: DbSession):
+    """Deletes an account only if it has no history (e.g. a spam signup). Otherwise deactivate it:
+    donations, applications, attendance and audit entries must stay traceable."""
+    user = db.get(User, user_id)
+    if user is None:
+        raise not_found("User")
+    if user.id == admin.id:
+        raise conflict("You cannot delete your own account.")
+    vol = user.volunteer
+    history = {
+        "an NGO": 1 if user.ngo else 0,
+        "donations": db.scalar(select(func.count()).where(Donation.donor_id == user.id)) or 0,
+        "audit log entries": db.scalar(select(func.count()).where(AuditLog.actor_user_id == user.id)) or 0,
+        "applications": db.scalar(select(func.count()).where(Application.volunteer_id == vol.id)) if vol else 0,
+        "attendance records": (db.scalar(select(func.count()).where(Participation.volunteer_id == vol.id))
+                               if vol else 0),
+        "tasks": db.scalar(select(func.count()).where(Task.volunteer_id == vol.id)) if vol else 0,
+    }
+    blocking = {k: v for k, v in history.items() if v}
+    if blocking:
+        raise conflict("This account can't be deleted because it has history ("
+                       + ", ".join(f"{v} {k}" if k != "an NGO" else "an NGO" for k, v in blocking.items())
+                       + "). Deactivate it instead.")
+    log_action(db, admin, "DELETE_USER", "User", user.id, {"email": user.email, "role": user.role.value})
+    db.delete(user)
+    db.commit()
+    return {"deleted": True}
+
+
+# ---------------------------------------------------------------------- reports
+
+@router.get("/reports")
+def reports(db: DbSession, admin: PlatformAdmin):
+    """Platform-wide report: top volunteers, every campaign, donations per campaign, resource utilization."""
+    top = PageParams(page=1, page_size=10)
+    everything = PageParams(page=1, page_size=100)
+    return {
+        "generated_at": utcnow().isoformat(),
+        "volunteers": r.volunteer_performance(admin, db, top, None)["items"],
+        "campaigns": r.campaign_report(admin, db, everything)["items"],
+        "donations": r.donation_summary(admin, db, everything)["items"],
+        "resources": r.resource_utilization(admin, db, everything, None)["items"],
+    }
 
 
 # ---------------------------------------------------------------------- stats

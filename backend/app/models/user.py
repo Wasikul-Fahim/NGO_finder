@@ -18,8 +18,12 @@ class User(TimestampMixin, Base):
     location: Mapped[str | None] = mapped_column(String(120))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    # {"muted_types": [...]}: user-chosen notification types to silence (HIGH priority is never muted)
+    notification_prefs: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
 
-    volunteer: Mapped["Volunteer | None"] = relationship(back_populates="user", uselist=False)
+    volunteer: Mapped["Volunteer | None"] = relationship(
+        back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
     ngo: Mapped["NGO | None"] = relationship(back_populates="user", uselist=False)
 
 
@@ -42,7 +46,11 @@ class NGO(TimestampMixin, Base):
     ngo_name: Mapped[str] = mapped_column(String(200), index=True)
     description: Mapped[str | None] = mapped_column(Text)
     address: Mapped[str | None] = mapped_column(String(300))
-    contact: Mapped[str | None] = mapped_column(String(120))
+    contact: Mapped[str | None] = mapped_column(String(120))  # public contact email
+    contact_number: Mapped[str | None] = mapped_column(String(30))
+    registration_info: Mapped[str | None] = mapped_column(Text)  # registration / licence details
+    logo_path: Mapped[str | None] = mapped_column(String(200))
+    verification_remarks: Mapped[str | None] = mapped_column(String(500))
     verification_status: Mapped[VerificationStatus] = enum_column(
         VerificationStatus, default=VerificationStatus.PENDING, index=True
     )

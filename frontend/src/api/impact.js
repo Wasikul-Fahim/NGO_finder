@@ -22,3 +22,8 @@ export const listBeneficiaries = (cid) => api.get(`/api/v1/campaigns/${cid}/bene
 export const enrollBeneficiary = (cid, body) => api.post(`/api/v1/campaigns/${cid}/beneficiaries`, body).then(unwrap);
 export const setSupportStatus = (cid, bid, support_status) => api.patch(`/api/v1/campaigns/${cid}/beneficiaries/${bid}`, { support_status }).then(unwrap);
 export const mySupport = () => api.get("/api/v1/support/me").then(unwrap);
+
+export const campaignReport = (params) => api.get("/api/v1/reports/campaigns", { params }).then(unwrap);
+export const resourceUtilization = (params) => api.get("/api/v1/reports/resource-utilization", { params }).then(unwrap);
+export const deleteResource = (id) => api.delete(`/api/v1/resources/${id}`).then(unwrap);
+export const updateDonation = (id, body) => api.patch(`/api/v1/donations/${id}`, body).then(unwrap);

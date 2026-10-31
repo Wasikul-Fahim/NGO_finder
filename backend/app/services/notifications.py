@@ -56,6 +56,8 @@ def notify(
     try:
         created: list[Notification] = []
         with db.begin_nested():
+            ids -= _muted_users(db, ids, type, priority)
+
             for uid in sorted(ids):
                 if dedupe_key and db.scalar(select(Notification.id).where(
                     Notification.user_id == uid, Notification.dedupe_key == dedupe_key,
@@ -90,6 +92,14 @@ def _deliver_after_commit(session: Session) -> None:
 @event.listens_for(Session, "after_rollback")
 def _discard_on_rollback(session: Session) -> None:
     session.info.pop(PENDING_KEY, None)
+
+
+def _muted_users(db: Session, ids: set[int], type: NotificationType, priority: NotificationPriority) -> set[int]:
+    """Users who switched this type off. HIGH priority and emergency alerts can never be muted."""
+    if priority == NotificationPriority.HIGH or type == NotificationType.EMERGENCY_ALERT:
+        return set()
+    rows = db.execute(select(User.id, User.notification_prefs).where(User.id.in_(ids)))
+    return {uid for uid, prefs in rows if type.value in ((prefs or {}).get("muted_types") or [])}
 
 
 def dedupe_hash(*parts: object) -> str:

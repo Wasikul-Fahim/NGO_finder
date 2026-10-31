@@ -1,8 +1,10 @@
 import os
+import tempfile
 from contextlib import nullcontext
 
 os.environ["DB_URL"] = "sqlite://"
 os.environ["SECRET_KEY"] = "test-secret-key-test-secret-key-1234"
+os.environ["UPLOAD_DIR"] = tempfile.mkdtemp(prefix="volunteersync-test-uploads-")
 
 import pytest
 from fastapi.testclient import TestClient
@@ -50,9 +52,10 @@ def client(db):
     app.dependency_overrides.clear()
 
 
-def make_user(db, email, role=Role.VOLUNTEER, name="Test User", active=True) -> User:
+def make_user(db, email, role=Role.VOLUNTEER, name="Test User", active=True, phone="01700000000") -> User:
     user = User(
-        name=name, email=email, password_hash=hash_password(PASSWORD), role=role, is_active=active
+        name=name, email=email, password_hash=hash_password(PASSWORD), role=role, is_active=active,
+        phone=phone,
     )
     db.add(user)
     db.flush()

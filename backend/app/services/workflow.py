@@ -40,6 +40,14 @@ def ensure_task_transition(current: TaskStatus, target: TaskStatus) -> None:
         raise AppError(409, "INVALID_TRANSITION", f"Cannot move a task from {current.value} to {target.value}.")
 
 
+def has_accepted_application(db: Session, volunteer_id: int, ngo_id: int) -> bool:
+    return db.scalar(
+        select(Application.id).join(Opportunity, Application.opportunity_id == Opportunity.id)
+        .where(Application.volunteer_id == volunteer_id, Application.status == ApplicationStatus.ACCEPTED,
+               Opportunity.ngo_id == ngo_id).limit(1)
+    ) is not None
+
+
 def ensure_assignable(
     db: Session, volunteer_id: int, ngo: NGO, opportunity_id: int | None = None
 ) -> Volunteer:

@@ -33,6 +33,16 @@ class DonationCreate(BaseModel):
         return self
 
 
+class DonationUpdate(BaseModel):
+    """An NGO correcting a record (e.g. a mistyped amount). Every change is audit-logged with before/after."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    amount: Decimal | None = Field(default=None, ge=0, le=MAX_AMOUNT, decimal_places=2)
+    donation_type: DonationType | None = None
+    note: str | None = Field(default=None, max_length=1000)
+
+
 class DonationStatusChange(BaseModel):
     status: Literal["RECEIVED", "REJECTED"]
 
@@ -118,7 +128,30 @@ class SupportUpdate(BaseModel):
     support_status: SupportStatus
 
 
+class ResourceCreateTop(ResourceCreate):
+    campaign_id: int
+
+
+class BeneficiaryCreateTop(BeneficiaryEnroll):
+    campaign_id: int
+    support_status: SupportStatus = SupportStatus.PENDING
+
+
+class BeneficiaryUpdate(BaseModel):
+    """`campaign_id` says which of your campaigns' enrolments you are updating."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    campaign_id: int
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    contact: str | None = Field(default=None, max_length=120)
+    location: str | None = Field(default=None, max_length=120)
+    required_assistance: str | None = Field(default=None, max_length=2000)
+    support_status: SupportStatus | None = None
+
+
 class CampaignBeneficiaryOut(BaseModel):
+    campaign_id: int | None = None
     beneficiary_id: int
     name: str
     contact: str | None

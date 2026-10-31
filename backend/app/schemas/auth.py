@@ -18,6 +18,18 @@ def validate_password_strength(value: str) -> str:
     return value
 
 
+def normalize_phone(value: str | None) -> str | None:
+    """Strip spaces/dashes/brackets; accept 7-15 digits with an optional leading +."""
+    if value is None:
+        return None
+    cleaned = re.sub(r"[\s\-()]", "", value.strip())
+    if not cleaned:
+        return None
+    if not re.fullmatch(r"\+?\d{7,15}", cleaned):
+        raise ValueError("Enter a valid mobile number, e.g. 01712345678 or +8801712345678.")
+    return cleaned
+
+
 class RegisterRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     email: EmailStr
@@ -34,6 +46,8 @@ class RegisterRequest(BaseModel):
         if not v:
             raise ValueError("Name is required.")
         return v
+
+    _phone = field_validator("phone")(normalize_phone)
 
     @field_validator("email")
     @classmethod
@@ -63,9 +77,13 @@ class NgoRegisterRequest(BaseModel):
     ngo_name: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=5000)
     address: str | None = Field(default=None, max_length=300)
-    contact: str | None = Field(default=None, max_length=120)
+    contact: str | None = Field(default=None, max_length=120)  # public contact email
+    contact_number: str | None = Field(default=None, max_length=30)
+    registration_info: str | None = Field(default=None, max_length=5000)
     phone: str | None = Field(default=None, max_length=30)
     location: str | None = Field(default=None, max_length=120)
+
+    _phones = field_validator("phone", "contact_number")(normalize_phone)
 
     @field_validator("name", "ngo_name")
     @classmethod
@@ -135,6 +153,8 @@ class UpdateProfileRequest(BaseModel):
             if not v:
                 raise ValueError("Name cannot be blank.")
         return v
+
+    _phone = field_validator("phone")(normalize_phone)
 
 
 class NgoSummary(BaseModel):

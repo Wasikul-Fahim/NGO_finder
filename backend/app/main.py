@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
 from app.core.config import BACKEND_DIR, get_settings
@@ -47,4 +48,9 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 app.include_router(api_router, prefix="/api/v1")
+# The API report documents paths as /api/...; serve the same routes there too (hidden from the docs page).
+app.include_router(api_router, prefix="/api", include_in_schema=False)
+_logos = settings.upload_path / "logos"
+_logos.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads/logos", StaticFiles(directory=_logos), name="logos")
 app.include_router(ws_router)

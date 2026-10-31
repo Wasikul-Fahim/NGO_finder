@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 import { myContributions } from "../api/impact";
 import { EmptyState, ErrorState, Loading } from "../components/AsyncState";
 import { Stat } from "../components/Notice";
@@ -10,12 +12,12 @@ export default function Impact() {
   const max = Math.max(1, ...data.monthly_hours.map((m) => m.hours));
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-2xl font-bold text-slate-900">My impact</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="font-display text-2xl font-bold text-slate-900">My impact</h1><Link to="/certificate" className="text-sm font-bold text-purple-700 hover:text-purple-900">View my volunteer certificate →</Link></div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Volunteer hours" value={`${data.total_hours} hrs`} />
         <Stat label="Events attended" value={data.events_attended} />
         <Stat label="Tasks completed" value={data.tasks_completed} hint={`of ${data.tasks_total} assigned`} />
-        <Stat label="Active months" value={data.monthly_hours.length} />
+        <Stat label="People reached" value={data.people_reached} hint={`${data.ngos_supported} NGO${data.ngos_supported === 1 ? "" : "s"} supported`} />
       </div>
 
       <section className="surface-card p-5">

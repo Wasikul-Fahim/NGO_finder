@@ -12,3 +12,4 @@ export const listAuditLogs = (params) => api.get("/api/v1/admin/audit-logs", { p
 export const auditActions = () => api.get("/api/v1/admin/audit-logs/actions").then(unwrap);
 export const ngoDashboard = () => api.get("/api/v1/ngos/me/dashboard").then(unwrap);
 export const ngoActivity = (params) => api.get("/api/v1/ngos/me/activity", { params }).then(unwrap);
+export const deleteUser = (id) => api.delete(`/api/v1/admin/users/${id}`).then(unwrap);

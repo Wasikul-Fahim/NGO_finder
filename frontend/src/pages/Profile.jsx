@@ -15,7 +15,7 @@ export default function Profile() {
 
   useEffect(() => {
     if (data) setForm({
-      location: data.location ?? "", skills: data.skills.join(", "), interests: data.interests.join(", "),
+      phone: data.phone ?? "", location: data.location ?? "", skills: data.skills.join(", "), interests: data.interests.join(", "),
       availability: data.availability, experience: data.experience ?? "",
     });
   }, [data]);
@@ -29,10 +29,11 @@ export default function Profile() {
     setFeedback({ ok: "", error: "", fields: {} });
     try {
       await updateMyProfile({
-        location: form.location.trim() || null, skills: toList(form.skills), interests: toList(form.interests),
+        phone: form.phone.trim() || null, location: form.location.trim() || null, skills: toList(form.skills), interests: toList(form.interests),
         availability: form.availability, experience: form.experience.trim() || null,
       });
       setFeedback({ ok: "Profile saved. Your recommendations are updated.", error: "", fields: {} });
+      reload();
     } catch (err) {
       const p = parseError(err);
       setFeedback({ ok: "", error: p.message, fields: p.fields });
@@ -47,6 +48,14 @@ export default function Profile() {
       </div>
       {feedback.ok && <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-emerald-700">{feedback.ok}</p>}
       {feedback.error && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2.5 text-sm font-semibold text-rose-700">{feedback.error}</p>}
+      {!data.profile_complete && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+          Finish your profile: add your <strong>mobile number</strong>, city and at least one skill. NGOs use your mobile number to contact you, and you need it before you can apply.
+        </p>
+      )}
+      <FormField label="Mobile number" error={feedback.fields.phone}>
+        <input className={inputClass} type="tel" autoComplete="tel" placeholder="01712345678" value={form.phone} onChange={set("phone")} />
+      </FormField>
       <FormField label="Location" error={feedback.fields.location}>
         <input className={inputClass} placeholder="City, Region — e.g. Dhaka, Dhaka" value={form.location} onChange={set("location")} />
       </FormField>

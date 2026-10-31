@@ -47,6 +47,8 @@ class ContributionOut(BaseModel):
     events_attended: int
     tasks_completed: int
     tasks_total: int
+    ngos_supported: int = 0
+    people_reached: int = 0  # beneficiaries enrolled in the campaigns the volunteer took part in
     monthly_hours: list[MonthlyHours]
     history: list[ParticipationOut]
 
@@ -59,3 +61,32 @@ class PerformanceRow(BaseModel):
     total_hours: float
     events_attended: int
     tasks_completed: int
+
+
+class CampaignReportRow(BaseModel):
+    campaign_id: int
+    campaign_title: str
+    ngo_name: str
+    status: str
+    is_emergency: bool
+    required_volunteers: int
+    accepted_volunteers: int
+    events: int
+    volunteer_hours: float
+    money_received: float
+    donation_goal: float | None
+    donation_progress: float | None
+    resources_total: int
+    resources_distributed: int
+
+
+class ResourceUtilizationRow(BaseModel):
+    resource_id: int
+    campaign_id: int
+    campaign_title: str
+    name: str
+    unit: str | None
+    quantity_total: int
+    quantity_allocated: int
+    quantity_remaining: int
+    utilization_percent: float

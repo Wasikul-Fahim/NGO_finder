@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   ChevronDown,
   HeartHandshake,
@@ -37,6 +37,11 @@ const pageTitles = {
   "/admin/reports": "Reports",
   "/support": "My Support",
   "/notifications": "Notifications",
+  "/account": "My Account",
+  "/events": "Events",
+  "/certificate": "Volunteer Certificate",
+  "/settings/notifications": "Notification Settings",
+  "/platform/reports": "Reports",
   "/admin/announcements": "Announcements",
   "/admin/profile": "Organisation Profile",
   "/platform": "Platform Overview",
@@ -135,7 +140,16 @@ function TopNav({ onMenu, profileOpen, onProfileToggle, apiStatus, user, onLogou
             <span className="hidden text-left sm:block"><span className="block text-xs font-bold text-slate-800">{user.name}</span><span className="block text-[10px] text-slate-400">{ROLE_LABELS[user.role]}</span></span>
             <ChevronDown size={15} className={`hidden text-slate-400 transition sm:block ${profileOpen ? "rotate-180" : ""}`} />
           </button>
-          {profileOpen && <div className="absolute right-0 top-14 w-48 rounded-xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/10"><p className="px-3 py-2 text-[11px] font-semibold text-slate-400">Account menu</p><p className="truncate px-3 pb-2 text-xs font-semibold text-slate-600">{user.email}</p><button onClick={onLogout} className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50">Log out</button></div>}
+          {profileOpen && (
+            <div className="absolute right-0 top-14 z-30 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/10">
+              <p className="truncate px-3 pt-2 text-xs font-bold text-slate-800">{user.name}</p>
+              <p className="truncate px-3 pb-2 text-[11px] text-slate-500">{user.email}</p>
+              {[["My account", "/account"], ...(user.role === "VOLUNTEER" ? [["Profile & skills", "/profile"], ["Volunteer certificate", "/certificate"]] : []), ["Notification settings", "/settings/notifications"]].map(([label, to]) => (
+                <Link key={to} to={to} className="block rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-purple-50 hover:text-purple-700">{label}</Link>
+              ))}
+              <button onClick={onLogout} className="mt-1 w-full rounded-lg border-t border-slate-100 px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50">Log out</button>
+            </div>
+          )}
         </div>
       </div>
     </header>

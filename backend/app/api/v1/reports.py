@@ -1,17 +1,22 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
+from sqlalchemy import distinct, func, select
+from sqlalchemy.orm import joinedload
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.errors import forbidden
 from app.models import (
+    Application,
+    ApplicationStatus,
     Campaign,
     Donation,
     DonationStatus,
     DonationType,
     Event,
+    Opportunity,
     Participation,
+    Resource,
     Role,
     Task,
     TaskStatus,
@@ -19,8 +24,8 @@ from app.models import (
 )
 from app.schemas.common import Page
 from app.schemas.finance import DonationSummaryRow
-from app.schemas.impact import PerformanceRow
-from app.services.campaigns import user_ngo_id
+from app.schemas.impact import CampaignReportRow, PerformanceRow, ResourceUtilizationRow
+from app.services.campaigns import received_by_campaign, user_ngo_id
 from app.services.pagination import PageParams, paginate_list
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -118,4 +123,66 @@ def donation_summary(user: CurrentUser, db: DbSession, params: Annotated[PagePar
         for cid, b in buckets.items()
     ]
     rows.sort(key=lambda r: (-r.money_received, r.campaign_title))
+    return paginate_list(rows, params)
+
+
+@router.get("/campaigns", response_model=Page[CampaignReportRow])
+def campaign_report(user: CurrentUser, db: DbSession, params: Annotated[PageParams, Depends()]):
+    """One row per campaign: volunteers, events, hours, money raised against the goal, stock handed out."""
+    ngo_id = _scope(db, user)
+    stmt = select(Campaign).options(joinedload(Campaign.ngo)).order_by(Campaign.id.desc())
+    if ngo_id is not None:
+        stmt = stmt.where(Campaign.ngo_id == ngo_id)
+    campaigns = db.scalars(stmt).all()
+    ids = [c.id for c in campaigns]
+    if not ids:
+        return paginate_list([], params)
+    volunteers = dict(db.execute(
+        select(Opportunity.campaign_id, func.count(distinct(Application.volunteer_id)))
+        .join(Application, Application.opportunity_id == Opportunity.id)
+        .where(Opportunity.campaign_id.in_(ids), Application.status == ApplicationStatus.ACCEPTED)
+        .group_by(Opportunity.campaign_id)).all())
+    events = dict(db.execute(select(Event.campaign_id, func.count()).where(Event.campaign_id.in_(ids))
+                             .group_by(Event.campaign_id)).all())
+    hours = dict(db.execute(
+        select(Event.campaign_id, func.coalesce(func.sum(Participation.hours), 0))
+        .join(Participation, Participation.event_id == Event.id)
+        .where(Event.campaign_id.in_(ids), Participation.attendance.is_(True)).group_by(Event.campaign_id)).all())
+    stock = {cid: (int(t), int(a)) for cid, t, a in db.execute(
+        select(Resource.campaign_id, func.sum(Resource.quantity_total), func.sum(Resource.quantity_allocated))
+        .where(Resource.campaign_id.in_(ids)).group_by(Resource.campaign_id))}
+    money = received_by_campaign(db, ids)
+    rows = []
+    for c in campaigns:
+        goal = float(c.donation_goal) if c.donation_goal is not None else None
+        got = money.get(c.id, 0.0)
+        total, given = stock.get(c.id, (0, 0))
+        rows.append(CampaignReportRow(
+            campaign_id=c.id, campaign_title=c.title, ngo_name=c.ngo.ngo_name, status=c.status.value,
+            is_emergency=bool(c.is_emergency), required_volunteers=c.required_volunteers,
+            accepted_volunteers=volunteers.get(c.id, 0), events=events.get(c.id, 0),
+            volunteer_hours=round(float(hours.get(c.id, 0)), 2), money_received=round(got, 2),
+            donation_goal=goal, donation_progress=round(min(got / goal * 100, 100), 1) if goal else None,
+            resources_total=total, resources_distributed=given))
+    return paginate_list(rows, params)
+
+
+@router.get("/resource-utilization", response_model=Page[ResourceUtilizationRow])
+def resource_utilization(user: CurrentUser, db: DbSession, params: Annotated[PageParams, Depends()],
+                         campaign_id: int | None = None):
+    """How much of each resource has been given out. Aggregate only: no beneficiary information."""
+    ngo_id = _scope(db, user)
+    stmt = select(Resource, Campaign.title).join(Campaign, Resource.campaign_id == Campaign.id)
+    if ngo_id is not None:
+        stmt = stmt.where(Campaign.ngo_id == ngo_id)
+    if campaign_id:
+        stmt = stmt.where(Resource.campaign_id == campaign_id)
+    rows = [
+        ResourceUtilizationRow(
+            resource_id=r.id, campaign_id=r.campaign_id, campaign_title=title, name=r.name, unit=r.unit,
+            quantity_total=r.quantity_total, quantity_allocated=r.quantity_allocated,
+            quantity_remaining=r.quantity_total - r.quantity_allocated,
+            utilization_percent=round(r.quantity_allocated / r.quantity_total * 100, 1) if r.quantity_total else 0.0)
+        for r, title in db.execute(stmt.order_by(Resource.id))
+    ]
     return paginate_list(rows, params)

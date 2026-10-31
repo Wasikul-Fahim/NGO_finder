@@ -17,16 +17,20 @@ from app.models import (
     Resource,
     ResourceDistribution,
     Role,
+    SupportStatus,
     User,
 )
 from app.schemas.common import Page
 from app.schemas.finance import (
+    BeneficiaryCreateTop,
     BeneficiaryEnroll,
+    BeneficiaryUpdate,
     CampaignBeneficiaryOut,
     DistributionCreate,
     DistributionOut,
     MySupportOut,
     ResourceCreate,
+    ResourceCreateTop,
     ResourceOut,
     ResourceUpdate,
     SupportUpdate,
@@ -58,7 +62,7 @@ def _owned_resource(db, resource_id: int, ngo) -> Resource:
 def _link_out(link: CampaignBeneficiary) -> CampaignBeneficiaryOut:
     b = link.beneficiary
     return CampaignBeneficiaryOut(
-        beneficiary_id=b.id, name=b.name, contact=b.contact, location=b.location,
+        campaign_id=link.campaign_id, beneficiary_id=b.id, name=b.name, contact=b.contact, location=b.location,
         required_assistance=b.required_assistance, support_status=link.support_status,
     )
 
@@ -93,6 +97,7 @@ def list_resources(campaign_id: int, ngo: CurrentNgo, db: DbSession):
 
 
 @router.patch("/resources/{resource_id}", response_model=ResourceOut)
+@router.put("/resources/{resource_id}", response_model=ResourceOut)
 def update_resource(resource_id: int, data: ResourceUpdate, ngo: VerifiedNgo, user: CurrentUser, db: DbSession):
     r = _owned_resource(db, resource_id, ngo)
     if r.campaign.status == CampaignStatus.ARCHIVED:
@@ -160,6 +165,10 @@ def list_distributions(resource_id: int, ngo: CurrentNgo, db: DbSession, params:
 
 @router.post("/campaigns/{campaign_id}/beneficiaries", response_model=CampaignBeneficiaryOut, status_code=201)
 def enroll(campaign_id: int, data: BeneficiaryEnroll, ngo: VerifiedNgo, user: CurrentUser, db: DbSession):
+    return _enroll(db, campaign_id, data, ngo, user, SupportStatus.PENDING)
+
+
+def _enroll(db, campaign_id: int, data: BeneficiaryEnroll, ngo, user, support_status):
     campaign = _writable_campaign(db, campaign_id, ngo)
     if data.email is not None:
         target = db.scalar(select(User).where(User.email == data.email.lower(), User.role == Role.BENEFICIARY))
@@ -177,7 +186,8 @@ def enroll(campaign_id: int, data: BeneficiaryEnroll, ngo: VerifiedNgo, user: Cu
         CampaignBeneficiary.campaign_id == campaign.id, CampaignBeneficiary.beneficiary_id == beneficiary.id
     )):
         raise conflict("Already enrolled in this campaign.")
-    link = CampaignBeneficiary(campaign_id=campaign.id, beneficiary_id=beneficiary.id)
+    link = CampaignBeneficiary(campaign_id=campaign.id, beneficiary_id=beneficiary.id,
+                               support_status=support_status)
     db.add(link)
     try:
         db.flush()
@@ -240,3 +250,72 @@ def my_support(user: BeneficiaryUser, db: DbSession):
     return out
 
 
+# ------------------------------------------------ report-style top-level routes
+
+@router.post("/resources", response_model=ResourceOut, status_code=201)
+def create_resource(data: ResourceCreateTop, ngo: VerifiedNgo, user: CurrentUser, db: DbSession):
+    return add_resource(data.campaign_id, ResourceCreate(**data.model_dump(exclude={"campaign_id"})),
+                        ngo, user, db)
+
+
+@router.get("/resources", response_model=Page[ResourceOut])
+def list_all_resources(ngo: CurrentNgo, db: DbSession, params: Annotated[PageParams, Depends()],
+                       campaign_id: int | None = None):
+    stmt = select(Resource).join(Campaign, Resource.campaign_id == Campaign.id).where(Campaign.ngo_id == ngo.id)
+    if campaign_id:
+        stmt = stmt.where(Resource.campaign_id == campaign_id)
+    return paginate(db, stmt.order_by(Resource.id), params, resource_out)
+
+
+@router.delete("/resources/{resource_id}")
+def delete_resource(resource_id: int, ngo: VerifiedNgo, user: CurrentUser, db: DbSession):
+    r = _owned_resource(db, resource_id, ngo)
+    if r.quantity_allocated > 0:
+        raise conflict(f"{r.quantity_allocated} {r.unit or 'units'} were already distributed, so this resource "
+                       "can't be deleted. Its history is kept for accountability.")
+    log_action(db, user, "DELETE_RESOURCE", "Resource", r.id, {"campaign_id": r.campaign_id, "name": r.name})
+    db.delete(r)
+    db.commit()
+    return {"deleted": True}
+
+
+@router.post("/beneficiaries", response_model=CampaignBeneficiaryOut, status_code=201)
+def create_beneficiary(data: BeneficiaryCreateTop, ngo: VerifiedNgo, user: CurrentUser, db: DbSession):
+    return _enroll(db, data.campaign_id, data, ngo, user, data.support_status)
+
+
+@router.get("/beneficiaries", response_model=Page[CampaignBeneficiaryOut])
+def list_all_beneficiaries(ngo: CurrentNgo, db: DbSession, params: Annotated[PageParams, Depends()],
+                           campaign_id: int | None = None, support_status: SupportStatus | None = None):
+    """Beneficiaries enrolled in this NGO's campaigns. No other role can list them."""
+    stmt = (select(CampaignBeneficiary).options(joinedload(CampaignBeneficiary.beneficiary))
+            .join(Campaign, CampaignBeneficiary.campaign_id == Campaign.id).where(Campaign.ngo_id == ngo.id))
+    if campaign_id:
+        stmt = stmt.where(CampaignBeneficiary.campaign_id == campaign_id)
+    if support_status:
+        stmt = stmt.where(CampaignBeneficiary.support_status == support_status)
+    return paginate(db, stmt.order_by(CampaignBeneficiary.id), params, _link_out)
+
+
+@router.put("/beneficiaries/{beneficiary_id}", response_model=CampaignBeneficiaryOut)
+@router.patch("/beneficiaries/{beneficiary_id}", response_model=CampaignBeneficiaryOut)
+def update_beneficiary(beneficiary_id: int, data: BeneficiaryUpdate, ngo: VerifiedNgo, user: CurrentUser,
+                       db: DbSession):
+    _writable_campaign(db, data.campaign_id, ngo)
+    link = db.scalar(select(CampaignBeneficiary).options(joinedload(CampaignBeneficiary.beneficiary)).where(
+        CampaignBeneficiary.campaign_id == data.campaign_id, CampaignBeneficiary.beneficiary_id == beneficiary_id))
+    if link is None:
+        raise not_found("Enrollment")
+    changes = {k: v for k, v in data.model_dump(exclude_unset=True, exclude={"campaign_id", "support_status"}).items()
+               if not (k == "name" and v is None)}
+    if changes and link.beneficiary.user_id is not None:
+        raise conflict("This person has their own account and manages their own details. "
+                       "You can only change their support status.")
+    for field, value in changes.items():
+        setattr(link.beneficiary, field, value)
+    if data.support_status is not None:
+        link.support_status = data.support_status
+    log_action(db, user, "UPDATE_BENEFICIARY", "CampaignBeneficiary", link.id,
+               {"fields": sorted(changes) + (["support_status"] if data.support_status else [])})
+    db.commit()
+    return _link_out(link)

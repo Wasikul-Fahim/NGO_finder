@@ -22,3 +22,4 @@ export const listTasks = (params) => api.get("/api/v1/tasks", { params }).then(u
 export const createTask = (body) => api.post("/api/v1/tasks", body).then(unwrap);
 export const assignTask = (id, volunteer_id) => api.post(`/api/v1/tasks/${id}/assign`, { volunteer_id }).then(unwrap);
 export const setTaskStatus = (id, status) => api.patch(`/api/v1/tasks/${id}/status`, { status }).then(unwrap);
+export const replyToNgo = (id, message) => api.post(`/api/v1/applications/${id}/reply`, { message }).then(unwrap);
