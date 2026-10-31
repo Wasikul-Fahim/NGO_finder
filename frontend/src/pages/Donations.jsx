@@ -1,8 +1,130 @@
-import { ArrowUpRight, CircleDollarSign, Download, WalletCards } from "lucide-react";
+import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
-import { donations } from "../data/dashboardData";
+import { listCampaigns } from "../api/campaigns";
+import { parseError } from "../api/client";
+import { getUtilization, makeDonation, myDonations } from "../api/impact";
+import { EmptyState, ErrorState, Loading } from "../components/AsyncState";
+import { StatusPill } from "../components/Chips";
+import FormField, { inputClass, primaryButton, secondaryButton, textareaClass } from "../components/FormField";
+import { ErrorNotice, SuccessNotice, money } from "../components/Notice";
+import Pager from "../components/Pager";
+import useAsync from "../hooks/useAsync";
+
+const TYPES = ["MONEY", "FOOD", "CLOTHES", "MEDICINE", "EDUCATIONAL", "OTHER"];
+
+function DonateForm({ campaigns, initialCampaign, onDone }) {
+  const [form, setForm] = useState({ campaign_id: initialCampaign || campaigns[0]?.id || "", donation_type: "MONEY", amount: "", note: "" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState({ message: "", fields: {} });
+  const [ok, setOk] = useState("");
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const isMoney = form.donation_type === "MONEY";
+
+  async function submit(e) {
+    e.preventDefault();
+    setSaving(true); setError({ message: "", fields: {} }); setOk("");
+    try {
+      await makeDonation({ campaign_id: Number(form.campaign_id), donation_type: form.donation_type, amount: Number(form.amount) || 0, note: form.note || null });
+      setOk("Thank you! Your pledge is recorded and will be confirmed by the NGO once received.");
+      setForm((f) => ({ ...f, amount: "", note: "" }));
+      onDone();
+    } catch (err) { setError(parseError(err)); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <form onSubmit={submit} className="surface-card space-y-4 p-5" noValidate>
+      <h2 className="font-display text-lg font-bold text-slate-900">Make a donation</h2>
+      <p className="text-xs text-slate-500">This records your pledge only. No payment details are collected or stored here.</p>
+      <SuccessNotice>{ok}</SuccessNotice>
+      <ErrorNotice>{error.message}</ErrorNotice>
+      <FormField label="Campaign" error={error.fields.campaign_id}>
+        <select className={inputClass} value={form.campaign_id} onChange={set("campaign_id")}>
+          {campaigns.map((c) => <option key={c.id} value={c.id}>{c.title} — {c.ngo_name}</option>)}
+        </select>
+      </FormField>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField label="Type" error={error.fields.donation_type}>
+          <select className={inputClass} value={form.donation_type} onChange={set("donation_type")}>{TYPES.map((t) => <option key={t}>{t}</option>)}</select>
+        </FormField>
+        <FormField label={isMoney ? "Amount (৳)" : "Estimated value (৳, optional)"} error={error.fields.amount}>
+          <input className={inputClass} type="number" min="0" step="0.01" value={form.amount} onChange={set("amount")} />
+        </FormField>
+      </div>
+      <FormField label={isMoney ? "Note (optional)" : "What are you donating?"} error={error.fields.note}>
+        <textarea className={textareaClass} rows={2} maxLength={1000} value={form.note} onChange={set("note")} />
+      </FormField>
+      <button className={primaryButton} disabled={saving || !form.campaign_id}>{saving ? "Saving…" : "Record donation"}</button>
+    </form>
+  );
+}
+
+function Utilization({ donations }) {
+  const received = [...new Map(donations.filter((d) => d.status === "RECEIVED" && d.campaign_id).map((d) => [d.campaign_id, d.campaign_title]))];
+  const [id, setId] = useState("");
+  const state = useAsync(() => (id ? getUtilization(id) : Promise.resolve(null)), [id]);
+  if (received.length === 0) return null;
+  return (
+    <section className="surface-card space-y-3 p-5">
+      <h2 className="font-display text-lg font-bold text-slate-900">Where your donation went</h2>
+      <select className={inputClass} value={id} aria-label="Campaign" onChange={(e) => setId(e.target.value)}>
+        <option value="">Choose a campaign…</option>
+        {received.map(([cid, title]) => <option key={cid} value={cid}>{title}</option>)}
+      </select>
+      {state.error && <ErrorNotice>{state.error}</ErrorNotice>}
+      {state.data && (
+        <div className="space-y-3">
+          <p className="text-sm text-slate-600">Money received by this campaign: <strong>{money(state.data.money_received)}</strong></p>
+          {state.data.resources.length === 0 ? <p className="text-sm text-slate-500">No resources tracked yet.</p> : state.data.resources.map((r) => (
+            <div key={r.id}>
+              <div className="flex justify-between text-xs font-bold text-slate-600"><span>{r.name}</span><span>{r.quantity_allocated} / {r.quantity_total} {r.unit} distributed</span></div>
+              <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${r.quantity_total ? (r.quantity_allocated / r.quantity_total) * 100 : 0}%` }} /></div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
 export default function Donations() {
-  const total = donations.reduce((sum, donation) => sum + donation.amount, 0);
-  return <div className="space-y-7"><section className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><h1 className="font-display text-3xl font-bold tracking-[-0.05em] text-slate-900">Donation & resources</h1><p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">A clear record of the causes you have helped move forward.</p></div><button className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-extrabold text-slate-700 shadow-sm hover:border-purple-200 hover:text-purple-700"><Download size={15} /> Export history</button></section><section className="grid gap-4 md:grid-cols-3"><div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#4c176f] to-[#7e32ad] p-6 text-white shadow-xl shadow-purple-900/10 md:col-span-2"><CircleDollarSign className="absolute -bottom-5 -right-4 text-white/10" size={140} strokeWidth={1} /><p className="relative text-[10px] font-bold uppercase tracking-[0.18em] text-purple-200">Total contributions</p><p className="relative mt-3 font-display text-4xl font-extrabold tracking-[-0.07em]">৳{total.toLocaleString()}</p><p className="relative mt-3 flex items-center gap-1.5 text-xs font-bold text-emerald-300"><ArrowUpRight size={14} /> 18% more than last quarter</p></div><div className="surface-card flex flex-col justify-between p-6"><span className="grid h-11 w-11 place-items-center rounded-xl bg-amber-50 text-amber-600"><WalletCards size={21} /></span><div><p className="mt-6 text-[10px] font-bold uppercase tracking-wider text-slate-400">Campaigns supported</p><p className="mt-1 font-display text-3xl font-extrabold tracking-[-0.05em] text-slate-900">4</p><p className="mt-2 text-xs font-semibold text-slate-400">Across 3 NGO partners</p></div></div></section><section className="surface-card overflow-hidden"><div className="flex items-center justify-between border-b border-slate-100 p-5"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Your giving history</p><h2 className="mt-1.5 font-display text-lg font-bold tracking-[-0.035em] text-slate-900">Recent donations</h2></div><span className="text-xs font-bold text-slate-400">{donations.length} records</span></div><div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left"><thead className="bg-slate-50/70 text-[10px] font-extrabold uppercase tracking-wider text-slate-400"><tr><th className="px-5 py-3.5">Campaign</th><th className="px-5 py-3.5">Partner NGO</th><th className="px-5 py-3.5">Amount</th><th className="px-5 py-3.5">Date</th><th className="px-5 py-3.5">Channel</th><th className="px-5 py-3.5">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{donations.map((donation) => <tr key={donation.id} className="text-xs font-semibold text-slate-600 transition hover:bg-purple-50/30"><td className="px-5 py-4 font-bold text-slate-800">{donation.campaign}</td><td className="px-5 py-4 text-purple-700">{donation.ngo}</td><td className="px-5 py-4 font-display font-bold text-slate-900">৳{donation.amount.toLocaleString()}</td><td className="px-5 py-4 text-slate-400">{donation.date}</td><td className="px-5 py-4"><span className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">{donation.channel}</span></td><td className="px-5 py-4"><span className="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-emerald-600"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{donation.status}</span></td></tr>)}</tbody></table></div></section></div>;
+  const [params] = useSearchParams();
+  const [page, setPage] = useState(1);
+  const history = useAsync(() => myDonations({ page, page_size: 10 }), [page]);
+  const campaigns = useAsync(() => listCampaigns({ status: "ACTIVE", page_size: 100 }));
+  const all = useAsync(() => myDonations({ page_size: 100 }));
+
+  if (campaigns.loading) return <Loading />;
+  if (campaigns.error) return <ErrorState message={campaigns.error} onRetry={campaigns.reload} />;
+  const refresh = () => { history.reload(); all.reload(); };
+
+  return (
+    <div className="space-y-6">
+      <h1 className="font-display text-2xl font-bold text-slate-900">Donations</h1>
+      {campaigns.data.items.length === 0
+        ? <EmptyState title="No campaigns are accepting donations" hint="Check back soon." />
+        : <DonateForm campaigns={campaigns.data.items} initialCampaign={Number(params.get("campaign")) || null} onDone={refresh} />}
+      {all.data && <Utilization donations={all.data.items} />}
+      <section className="space-y-3">
+        <h2 className="font-display text-lg font-bold text-slate-900">My donation history</h2>
+        {history.loading ? <Loading rows={2} /> : history.error ? <ErrorState message={history.error} onRetry={history.reload} /> : history.data.items.length === 0 ? (
+          <EmptyState title="No donations yet" />
+        ) : (
+          <ul className="space-y-2">
+            {history.data.items.map((d) => (
+              <li key={d.id} className="surface-card flex items-center justify-between gap-3 p-4">
+                <div>
+                  <p className="font-bold text-slate-900">{d.campaign_title} <span className="font-normal text-slate-500">· {d.ngo_name}</span></p>
+                  <p className="text-xs text-slate-500">{d.donation_date} · {d.donation_type}{d.donation_type === "MONEY" ? ` · ${money(d.amount)}` : ""}{d.note ? ` · ${d.note}` : ""}</p>
+                </div>
+                <StatusPill status={d.status} />
+              </li>
+            ))}
+          </ul>
+        )}
+        <Pager data={history.data} page={page} onPage={setPage} />
+      </section>
+    </div>
+  );
 }

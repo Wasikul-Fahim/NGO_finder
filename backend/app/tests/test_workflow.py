@@ -67,7 +67,9 @@ def test_review_queue_scoped_to_own_ngo(client, ngo_headers, other_ngo_headers, 
     apply(client, volunteer_headers, oid)
     q = client.get(f"{API}/applications", headers=ngo_headers).json()
     assert q["total"] == 1 and q["items"][0]["volunteer_name"]
-    assert "email" not in str(q["items"][0])
+    # applying shares contact details with the owning NGO only (see test_ngo_onboarding)
+    assert q["items"][0]["volunteer_email"] == "vol@example.com"
+    assert "password" not in str(q["items"][0])
     assert client.get(f"{API}/applications", headers=other_ngo_headers).json()["total"] == 0
     assert client.get(f"{API}/applications", headers=volunteer_headers).status_code == 403
     assert client.get(f"{API}/applications?status=ACCEPTED", headers=ngo_headers).json()["total"] == 0

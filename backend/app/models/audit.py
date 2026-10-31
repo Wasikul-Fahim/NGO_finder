@@ -20,3 +20,12 @@ class AuditLog(Base):
     entity_id: Mapped[int | None] = mapped_column(Integer)
     details: Mapped[dict] = mapped_column(JSON, default=dict)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+from sqlalchemy import event
+
+
+@event.listens_for(AuditLog, "before_update")
+@event.listens_for(AuditLog, "before_delete")
+def _audit_is_append_only(mapper, connection, target):
+    raise RuntimeError("Audit log entries are append-only and cannot be modified or deleted.")

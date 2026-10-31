@@ -6,7 +6,7 @@ from sqlalchemy.orm import joinedload
 
 from app.api.deps import CurrentUser, DbSession, OptionalUser, VerifiedNgo
 from app.core.errors import AppError, conflict
-from app.models import Campaign, CampaignStatus
+from app.models import Campaign, CampaignStatus, NotificationType
 from app.schemas.campaign import (
     CampaignCreate,
     CampaignOut,
@@ -15,7 +15,9 @@ from app.schemas.campaign import (
 )
 from app.schemas.common import Page
 from app.services import campaigns as svc
+from app.services import notifications
 from app.services.audit import log_action
+from app.services.notifications import notify
 from app.services.pagination import PageParams, paginate
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
@@ -119,6 +121,11 @@ def change_status(
         db, user, "CHANGE_CAMPAIGN_STATUS", "Campaign", campaign.id,
         {"from": previous.value, "to": data.status.value},
     )
+    audience = notifications.volunteer_user_ids(db, ngo.id) | notifications.donor_user_ids(db, ngo.id, campaign.id)
+    notify(db, audience, title="Campaign update",
+           message=f'"{campaign.title}" is now {data.status.value.lower()}.',
+           type=NotificationType.CAMPAIGN_UPDATE, link="/campaigns",
+           dedupe_key=f"campaign:{campaign.id}:{data.status.value}")
     db.commit()
     return to_out(campaign)
 

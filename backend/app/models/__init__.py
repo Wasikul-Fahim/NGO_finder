@@ -6,10 +6,19 @@ from app.models.enums import (
     ApplicationStatus,
     BeneficiaryStatus,
     CampaignStatus,
+    DonationStatus,
+    DonationType,
+    NotificationPriority,
+    NotificationStatus,
+    NotificationType,
     Role,
+    SupportStatus,
     TaskStatus,
     VerificationStatus,
 )
+from app.models.finance import CampaignBeneficiary, Donation, Resource, ResourceDistribution
+from app.models.impact import Participation
+from app.models.notification import Notification
 from app.models.opportunity import Application, Opportunity, Task
 from app.models.user import NGO, Beneficiary, RefreshToken, User, Volunteer
 
@@ -23,11 +32,23 @@ __all__ = [
     "Beneficiary",
     "BeneficiaryStatus",
     "Campaign",
+    "CampaignBeneficiary",
     "CampaignStatus",
+    "Donation",
+    "DonationStatus",
+    "DonationType",
     "Event",
+    "Notification",
+    "NotificationPriority",
+    "NotificationStatus",
+    "NotificationType",
     "Opportunity",
+    "Participation",
     "RefreshToken",
+    "Resource",
+    "ResourceDistribution",
     "Role",
+    "SupportStatus",
     "Task",
     "TaskStatus",
     "User",

@@ -44,3 +44,48 @@ class TaskStatus(enum.StrEnum):
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     DECLINED = "DECLINED"
+
+
+class DonationType(enum.StrEnum):
+    MONEY = "MONEY"
+    FOOD = "FOOD"
+    CLOTHES = "CLOTHES"
+    MEDICINE = "MEDICINE"
+    EDUCATIONAL = "EDUCATIONAL"
+    OTHER = "OTHER"
+
+
+class DonationStatus(enum.StrEnum):
+    PENDING = "PENDING"
+    RECEIVED = "RECEIVED"
+    REJECTED = "REJECTED"
+
+
+class SupportStatus(enum.StrEnum):
+    PENDING = "PENDING"
+    ACTIVE = "ACTIVE"
+    COMPLETED = "COMPLETED"
+
+
+class NotificationType(enum.StrEnum):
+    APPLICATION_UPDATE = "APPLICATION_UPDATE"
+    TASK_ASSIGNED = "TASK_ASSIGNED"
+    TASK_UPDATE = "TASK_UPDATE"
+    EVENT_REMINDER = "EVENT_REMINDER"
+    ATTENDANCE = "ATTENDANCE"
+    CAMPAIGN_UPDATE = "CAMPAIGN_UPDATE"
+    DONATION_UPDATE = "DONATION_UPDATE"
+    ANNOUNCEMENT = "ANNOUNCEMENT"
+    EMERGENCY_ALERT = "EMERGENCY_ALERT"
+    DIRECT_MESSAGE = "DIRECT_MESSAGE"
+
+
+class NotificationPriority(enum.StrEnum):
+    LOW = "LOW"
+    NORMAL = "NORMAL"
+    HIGH = "HIGH"
+
+
+class NotificationStatus(enum.StrEnum):
+    UNREAD = "UNREAD"
+    READ = "READ"

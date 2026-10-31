@@ -7,10 +7,10 @@ const AuthContext = createContext(null);
 
 export const ROLE_HOME = {
   NGO_ADMIN: "/admin",
-  PLATFORM_ADMIN: "/dashboard",
+  PLATFORM_ADMIN: "/platform",
   VOLUNTEER: "/dashboard",
   DONOR: "/campaigns",
-  BENEFICIARY: "/campaigns",
+  BENEFICIARY: "/support",
 };
 
 export function AuthProvider({ children }) {
@@ -45,7 +45,7 @@ export function AuthProvider({ children }) {
   }, [applySession]);
 
   const value = useMemo(
-    () => ({ user, isLoading, isAuthenticated: !!user, login, logout, register: authApi.register }),
+    () => ({ user, isLoading, isAuthenticated: !!user, login, logout, register: authApi.register, registerNgo: authApi.registerNgo }),
     [user, isLoading, login, logout],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

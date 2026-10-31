@@ -1,10 +1,10 @@
 import { useState } from "react";
 
-import { reviewApplication, reviewQueue } from "../../api/opportunities";
+import { messageApplicant, reviewApplication, reviewQueue } from "../../api/opportunities";
 import { parseError } from "../../api/client";
 import { EmptyState, ErrorState, Loading } from "../../components/AsyncState";
 import { ChipList, StatusPill } from "../../components/Chips";
-import { inputClass, primaryButton, secondaryButton } from "../../components/FormField";
+import { inputClass, primaryButton, secondaryButton, textareaClass } from "../../components/FormField";
 import useAsync from "../../hooks/useAsync";
 
 const STATUSES = ["", "SUBMITTED", "UNDER_REVIEW", "ACCEPTED", "REJECTED"];
@@ -15,6 +15,32 @@ const NEXT = {
   REJECTED: [],
 };
 
+function MessageBox({ application, onDone }) {
+  const [text, setText] = useState("");
+  const [state, setState] = useState({ busy: false, error: "", ok: "" });
+  async function send(e) {
+    e.preventDefault();
+    setState({ busy: true, error: "", ok: "" });
+    try {
+      const r = await messageApplicant(application.id, text);
+      setState({ busy: false, error: "", ok: r.sent ? "Message sent." : "That exact message is already waiting unread." });
+      if (r.sent) setText("");
+    } catch (err) { setState({ busy: false, error: parseError(err).message, ok: "" }); }
+  }
+  return (
+    <form onSubmit={send} className="space-y-2 rounded-lg bg-slate-50 p-3">
+      <textarea className={textareaClass} rows={3} maxLength={1000} required aria-label={`Message to ${application.volunteer_name}`}
+        placeholder={`Write to ${application.volunteer_name}: interview time, next steps, questions…`} value={text} onChange={(e) => setText(e.target.value)} />
+      <div className="flex flex-wrap items-center gap-3">
+        <button className={primaryButton} disabled={state.busy || !text.trim()}>{state.busy ? "Sending…" : "Send message"}</button>
+        <button type="button" className={secondaryButton} onClick={onDone}>Close</button>
+        {state.ok && <span role="status" className="text-xs font-semibold text-emerald-700">{state.ok}</span>}
+        {state.error && <span role="alert" className="text-xs font-semibold text-rose-600">{state.error}</span>}
+      </div>
+    </form>
+  );
+}
+
 export default function ReviewApplications() {
   const [status, setStatus] = useState("SUBMITTED");
   const [page, setPage] = useState(1);
@@ -22,6 +48,7 @@ export default function ReviewApplications() {
     () => reviewQueue({ page, page_size: 10, ...(status ? { status } : {}) }), [status, page]);
   const [notes, setNotes] = useState({});
   const [busy, setBusy] = useState(null);
+  const [messaging, setMessaging] = useState(null);
   const [actionError, setActionError] = useState("");
 
   async function move(a, target) {
@@ -55,6 +82,12 @@ export default function ReviewApplications() {
                 <StatusPill status={a.status} />
               </div>
               <ChipList items={a.volunteer_skills} tone="slate" />
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
+                <a className="font-bold text-purple-700 hover:text-purple-900" href={`mailto:${a.volunteer_email}`}>{a.volunteer_email}</a>
+                {a.volunteer_phone && <a className="font-bold text-purple-700 hover:text-purple-900" href={`tel:${a.volunteer_phone}`}>{a.volunteer_phone}</a>}
+                <button className="font-bold text-slate-600 hover:text-slate-900" onClick={() => setMessaging(messaging === a.id ? null : a.id)}>{messaging === a.id ? "Hide message box" : "Message in app"}</button>
+              </div>
+              {messaging === a.id && <MessageBox application={a} onDone={() => setMessaging(null)} />}
               {NEXT[a.status].length > 0 && (
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <input className={inputClass} placeholder="Optional note to the volunteer" maxLength={500} value={notes[a.id] ?? ""} onChange={(e) => setNotes((n) => ({ ...n, [a.id]: e.target.value }))} />

@@ -52,6 +52,46 @@ class RegisterRequest(BaseModel):
         return self
 
 
+class NgoRegisterRequest(BaseModel):
+    """An organisation signs itself up. It starts UNVERIFIED and cannot publish anything until a
+    platform admin verifies it, so open signup does not hand out any public-facing power."""
+
+    name: str = Field(min_length=1, max_length=120)
+    email: EmailStr
+    password: str
+    confirm_password: str
+    ngo_name: str = Field(min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=5000)
+    address: str | None = Field(default=None, max_length=300)
+    contact: str | None = Field(default=None, max_length=120)
+    phone: str | None = Field(default=None, max_length=30)
+    location: str | None = Field(default=None, max_length=120)
+
+    @field_validator("name", "ngo_name")
+    @classmethod
+    def _strip(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("This field cannot be blank.")
+        return v
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, v: str) -> str:
+        return v.strip().lower()
+
+    @field_validator("password")
+    @classmethod
+    def _password(cls, v: str) -> str:
+        return validate_password_strength(v)
+
+    @model_validator(mode="after")
+    def _confirm(self) -> Self:
+        if self.password != self.confirm_password:
+            raise ValueError("Passwords do not match.")
+        return self
+
+
 class LoginRequest(BaseModel):
     # Plain str: login only needs to match a stored address; strict syntax checks belong to signup.
     email: str = Field(min_length=3, max_length=255)

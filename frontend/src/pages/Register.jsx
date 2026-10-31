@@ -3,22 +3,27 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { parseError } from "../api/client";
 import AuthLayout from "../components/AuthLayout";
-import FormField, { inputClass, primaryButton } from "../components/FormField";
+import FormField, { inputClass, primaryButton, textareaClass } from "../components/FormField";
 import { ROLE_HOME, useAuth } from "../context/AuthContext";
 
 const ROLES = [
-  { value: "VOLUNTEER", label: "Volunteer" },
-  { value: "DONOR", label: "Donor" },
-  { value: "BENEFICIARY", label: "Beneficiary" },
+  { value: "VOLUNTEER", label: "Volunteer: I want to help" },
+  { value: "NGO", label: "NGO / organisation: I want to post campaigns and recruit" },
+  { value: "DONOR", label: "Donor: I want to give" },
+  { value: "BENEFICIARY", label: "Beneficiary: I need support" },
 ];
 
 export default function Register() {
-  const { register, login } = useAuth();
+  const { register, registerNgo, login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirm_password: "", role: "VOLUNTEER", location: "" });
+  const [form, setForm] = useState({
+    name: "", email: "", password: "", confirm_password: "", role: "VOLUNTEER", location: "",
+    ngo_name: "", description: "", address: "", contact: "",
+  });
   const [error, setError] = useState({ message: "", fields: {} });
   const [submitting, setSubmitting] = useState(false);
 
+  const isNgo = form.role === "NGO";
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   async function onSubmit(e) {
@@ -30,7 +35,12 @@ export default function Register() {
     }
     setSubmitting(true);
     try {
-      await register({ ...form, location: form.location.trim() || null });
+      const base = { name: form.name, email: form.email, password: form.password, confirm_password: form.confirm_password, location: form.location.trim() || null };
+      if (isNgo) {
+        await registerNgo({ ...base, ngo_name: form.ngo_name, description: form.description.trim() || null, address: form.address.trim() || null, contact: form.contact.trim() || null });
+      } else {
+        await register({ ...base, role: form.role });
+      }
       const user = await login({ email: form.email, password: form.password });
       navigate(ROLE_HOME[user.role] || "/dashboard", { replace: true });
     } catch (err) {
@@ -43,7 +53,7 @@ export default function Register() {
   return (
     <AuthLayout
       title="Create your account"
-      subtitle="Join as a volunteer, donor or beneficiary. NGO accounts are set up by the platform team."
+      subtitle="Join as a volunteer, NGO, donor or beneficiary."
       footer={<>Already registered? <Link className="font-bold text-purple-700 hover:text-purple-900" to="/login">Log in</Link></>}
     >
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
@@ -53,13 +63,30 @@ export default function Register() {
             {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
         </FormField>
-        <FormField label="Full name" error={error.fields.name}>
+        {isNgo && (
+          <>
+            <p className="rounded-lg bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-800">
+              After you sign up, the platform team verifies your organisation. You can log in and set up your profile straight away, but you can post campaigns, opportunities and events only once you are verified.
+            </p>
+            <FormField label="Organisation name" error={error.fields.ngo_name}>
+              <input className={inputClass} required value={form.ngo_name} onChange={set("ngo_name")} />
+            </FormField>
+            <FormField label="What does your organisation do?" error={error.fields.description}>
+              <textarea className={textareaClass} rows={3} value={form.description} onChange={set("description")} />
+            </FormField>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField label="Address" error={error.fields.address}><input className={inputClass} value={form.address} onChange={set("address")} /></FormField>
+              <FormField label="Public contact (email / phone)" error={error.fields.contact}><input className={inputClass} value={form.contact} onChange={set("contact")} /></FormField>
+            </div>
+          </>
+        )}
+        <FormField label={isNgo ? "Your full name" : "Full name"} error={error.fields.name}>
           <input className={inputClass} autoComplete="name" required value={form.name} onChange={set("name")} />
         </FormField>
         <FormField label="Email" error={error.fields.email}>
           <input className={inputClass} type="email" autoComplete="email" required value={form.email} onChange={set("email")} />
         </FormField>
-        <FormField label="Location (city)" error={error.fields.location}>
+        <FormField label={isNgo ? "City (e.g. Dhaka, Dhaka)" : "Location (City, Region)"} error={error.fields.location}>
           <input className={inputClass} autoComplete="address-level2" value={form.location} onChange={set("location")} />
         </FormField>
         <FormField label="Password" error={error.fields.password}>
@@ -69,7 +96,7 @@ export default function Register() {
         <FormField label="Confirm password" error={error.fields.confirm_password}>
           <input className={inputClass} type="password" autoComplete="new-password" required value={form.confirm_password} onChange={set("confirm_password")} />
         </FormField>
-        <button className={`${primaryButton} w-full`} disabled={submitting}>{submitting ? "Creating account…" : "Create account"}</button>
+        <button className={`${primaryButton} w-full`} disabled={submitting}>{submitting ? "Creating account…" : isNgo ? "Register my organisation" : "Create account"}</button>
       </form>
     </AuthLayout>
   );

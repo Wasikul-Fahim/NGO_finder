@@ -7,6 +7,8 @@ let accessToken = null;
 let onAuthLost = () => {};
 
 export const setAccessToken = (token) => { accessToken = token; };
+export const getAccessToken = () => accessToken;
+export const apiBaseUrl = baseURL;
 export const setAuthLostHandler = (fn) => { onAuthLost = fn; };
 
 const api = axios.create({

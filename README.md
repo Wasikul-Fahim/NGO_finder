@@ -46,7 +46,10 @@ Open http://localhost:5173 and log in with a seeded account (password `Demo12345
 | `volunteer2@example.com` | Volunteer |
 | `donor1@example.com` | Donor |
 | `beneficiary1@example.com` | Beneficiary |
-| `admin@example.com` | Platform admin |
+| `admin@example.com` | Platform admin (verifies NGOs, manages users, audit log) |
+
+**New NGO?** Choose "NGO / organisation" on the Register page. You can log in right away, but a platform admin
+(`admin@example.com`) must verify the NGO under *NGOs & verification* before it can post campaigns or recruit.
 
 Re-running `setup_local.py` is safe (it never duplicates data). To start fresh, delete
 `backend/volunteersync.db` and run it again.

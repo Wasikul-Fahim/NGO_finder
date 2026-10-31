@@ -1,12 +1,55 @@
-import { Flame, HeartHandshake, Search, SlidersHorizontal } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Calendar, MapPin, Users } from "lucide-react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 
-import CampaignCard from "../components/CampaignCard";
-import { campaigns } from "../data/dashboardData";
+import { listCampaigns } from "../api/campaigns";
+import { EmptyState, ErrorState, Loading } from "../components/AsyncState";
+import { inputClass, primaryButton } from "../components/FormField";
+import Pager from "../components/Pager";
+import { useAuth } from "../context/AuthContext";
+import useAsync from "../hooks/useAsync";
 
 export default function Campaigns() {
+  const { user } = useAuth();
+  const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
-  const [urgentOnly, setUrgentOnly] = useState(false);
-  const filtered = useMemo(() => campaigns.filter((campaign) => campaign.title.toLowerCase().includes(query.toLowerCase()) && (!urgentOnly || campaign.urgent)), [query, urgentOnly]);
-  return <div className="space-y-7"><section className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end"><div><div className="mb-3 inline-flex items-center gap-2 rounded-full bg-rose-50 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-rose-600"><Flame size={12} />2 campaigns need urgent support</div><h1 className="font-display text-3xl font-bold tracking-[-0.05em] text-slate-900">Causes in motion</h1><p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">Back the campaigns creating measurable change in communities across Bangladesh.</p></div><button className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-extrabold text-slate-700 shadow-sm hover:border-purple-200 hover:text-purple-700"><SlidersHorizontal size={16} /> Campaign preferences</button></section><section className="surface-card flex flex-col gap-3 p-4 sm:flex-row"><label className="relative flex-1"><Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none focus:border-purple-400 focus:bg-white" placeholder="Search campaigns" /></label><button onClick={() => setUrgentOnly((value) => !value)} className={`rounded-lg px-4 text-xs font-extrabold transition ${urgentOnly ? "bg-rose-50 text-rose-700 ring-1 ring-rose-200" : "border border-slate-200 bg-white text-slate-600 hover:border-rose-200"}`}>{urgentOnly ? "Urgent only ✓" : "Show urgent only"}</button></section><div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{filtered.map((campaign) => <CampaignCard key={campaign.id} campaign={campaign} />)}</div>{filtered.length === 0 && <div className="surface-card p-12 text-center text-sm font-semibold text-slate-500">No campaigns match your search.</div>}<section className="surface-card flex flex-col items-center gap-4 bg-gradient-to-r from-purple-50 to-amber-50 p-6 text-center sm:flex-row sm:text-left"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white text-purple-700 shadow-sm"><HeartHandshake size={23} /></span><div className="flex-1"><h2 className="font-display text-base font-bold text-slate-900">Your support goes further together.</h2><p className="mt-1 text-xs leading-5 text-slate-500">Every donation and volunteer hour helps local teams respond faster.</p></div><button className="rounded-lg bg-[#6b21a8] px-4 py-2.5 text-xs font-extrabold text-white hover:bg-[#581c87]">Learn about impact</button></section></div>;
+  const [page, setPage] = useState(1);
+  const { data, loading, error, reload } = useAsync(
+    () => listCampaigns({ page, page_size: 12, ...(query ? { q: query } : {}) }), [page, query]);
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-display text-2xl font-bold text-slate-900">Campaigns</h1>
+        <p className="mt-1 text-sm text-slate-500">Causes run by verified NGOs.</p>
+      </div>
+      <form className="surface-card flex gap-3 p-4" onSubmit={(e) => { e.preventDefault(); setPage(1); setQuery(q); }}>
+        <input className={inputClass} placeholder="Search campaigns" aria-label="Search campaigns" value={q} onChange={(e) => setQ(e.target.value)} />
+        <button className={primaryButton}>Search</button>
+      </form>
+      {loading ? <Loading /> : error ? <ErrorState message={error} onRetry={reload} /> : data.items.length === 0 ? (
+        <EmptyState title="No campaigns found" hint="Try a different search." />
+      ) : (
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {data.items.map((c) => (
+            <article key={c.id} className="surface-card flex flex-col p-5">
+              <span className={`w-fit rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${c.status === "ACTIVE" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{c.status}</span>
+              <h3 className="mt-3 font-display text-base font-bold text-slate-900">{c.title}</h3>
+              <p className="mt-0.5 text-xs font-semibold text-purple-700">{c.ngo_name}</p>
+              {c.description && <p className="mt-3 line-clamp-3 text-sm text-slate-600">{c.description}</p>}
+              <div className="mt-4 space-y-1.5 text-xs text-slate-500">
+                {c.location && <p className="flex items-center gap-1.5"><MapPin size={13} />{c.location}</p>}
+                <p className="flex items-center gap-1.5"><Calendar size={13} />{c.start_date} → {c.end_date}</p>
+                <p className="flex items-center gap-1.5"><Users size={13} />{c.required_volunteers} volunteers needed</p>
+              </div>
+              <div className="mt-auto flex gap-2 pt-5">
+                {user.role === "DONOR" && c.status === "ACTIVE" && <Link to={`/donations?campaign=${c.id}`} className={`${primaryButton} flex-1`}>Donate</Link>}
+                {user.role === "VOLUNTEER" && <Link to="/opportunities" className={`${primaryButton} flex-1`}>Find a role</Link>}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+      <Pager data={data} page={page} onPage={setPage} />
+    </div>
+  );
 }

@@ -212,3 +212,31 @@ def test_login_accepts_any_stored_email_domain(client, db):
     make_user(db, "demo@volunteersync.test")
     r = client.post("/api/v1/auth/login", json={"email": "demo@volunteersync.test", "password": PASSWORD})
     assert r.status_code == 200
+
+
+def _preflight(client, origin):
+    return client.options("/api/v1/auth/login", headers={
+        "Origin": origin, "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "content-type"})
+
+
+def test_cors_allows_local_dev_origins_on_any_port(client):
+    for origin in ("http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174"):
+        r = _preflight(client, origin)
+        assert r.status_code == 200 and r.headers["access-control-allow-origin"] == origin
+        assert r.headers["access-control-allow-credentials"] == "true"
+
+
+def test_cors_rejects_other_origins(client):
+    for origin in ("https://evil.example.com", "http://localhost.evil.com:5173", "https://localhost:5173"):
+        assert _preflight(client, origin).status_code == 400
+
+
+def test_relative_sqlite_path_is_anchored_to_backend_folder(monkeypatch):
+    from app.core.config import BACKEND_DIR, Settings
+
+    monkeypatch.chdir("/")  # whatever folder the server happens to be started from
+    s = Settings(db_url="sqlite:///./volunteersync.db", secret_key="x" * 40)
+    assert s.db_url == f"sqlite:///{(BACKEND_DIR / 'volunteersync.db').as_posix()}"
+    assert Settings(db_url="sqlite://", secret_key="x" * 40).db_url == "sqlite://"  # in-memory untouched
+    absolute = Settings(db_url="sqlite:////tmp/x.db", secret_key="x" * 40)
+    assert absolute.db_url == "sqlite:////tmp/x.db"

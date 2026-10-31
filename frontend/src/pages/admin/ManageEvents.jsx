@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { createEvent, deleteEvent, getMyNgo, listCampaigns, listEvents, updateEvent } from "../../api/campaigns";
 import { parseError } from "../../api/client";
+import { sendEventReminder } from "../../api/notifications";
 import { EmptyState, ErrorState, Loading } from "../../components/AsyncState";
 import FormField, { inputClass, primaryButton, secondaryButton, textareaClass } from "../../components/FormField";
 import useAsync from "../../hooks/useAsync";
@@ -73,6 +74,15 @@ export default function ManageEvents() {
   const mine = events.data.items.filter((e) => ownIds.has(e.campaign_id));
   const openIds = new Set(open.map((c) => c.id));
 
+  async function remind(event) {
+    setActionError("");
+    try {
+      const r = await sendEventReminder(event.id);
+      setActionError("");
+      window.alert(r.audience_size === 0 ? "No accepted volunteers to remind yet." : r.recipients === 0 ? "Everyone has already been reminded." : `Reminder sent to ${r.recipients} volunteer(s).`);
+    } catch (err) { setActionError(parseError(err).message); }
+  }
+
   async function remove(event) {
     if (!window.confirm(`Delete "${event.event_name}"?`)) return;
     setActionError("");
@@ -104,6 +114,7 @@ export default function ManageEvents() {
               </div>
               {openIds.has(e.campaign_id) && verified && (
                 <div className="flex gap-2">
+                  {e.event_date >= new Date().toISOString().slice(0, 10) && <button className={secondaryButton} onClick={() => remind(e)}>Remind volunteers</button>}
                   <button className={secondaryButton} onClick={() => setEditing(e)}>Edit</button>
                   <button className={secondaryButton} onClick={() => remove(e)}>Delete</button>
                 </div>

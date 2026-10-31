@@ -14,6 +14,7 @@ export const deactivateOpportunity = (id) => api.delete(`/api/v1/opportunities/$
 export const applyTo = (id) => api.post(`/api/v1/opportunities/${id}/applications`).then(unwrap);
 export const myApplications = (params) => api.get("/api/v1/applications/me", { params }).then(unwrap);
 export const reviewQueue = (params) => api.get("/api/v1/applications", { params }).then(unwrap);
+export const messageApplicant = (id, message) => api.post(`/api/v1/applications/${id}/messages`, { message }).then(unwrap);
 export const reviewApplication = (id, status, note) => api.patch(`/api/v1/applications/${id}/review`, { status, note: note || null }).then(unwrap);
 
 export const myTasks = (params) => api.get("/api/v1/tasks/me", { params }).then(unwrap);

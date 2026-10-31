@@ -15,11 +15,22 @@ from app.core.database import SessionLocal
 from app.core.security import hash_password
 from app.models import (
     NGO,
+    Application,
+    ApplicationStatus,
     Beneficiary,
     Campaign,
+    CampaignBeneficiary,
     CampaignStatus,
+    Donation,
+    DonationStatus,
+    DonationType,
     Event,
+    Notification,
+    NotificationPriority,
+    NotificationType,
     Opportunity,
+    Participation,
+    Resource,
     Role,
     User,
     VerificationStatus,
@@ -116,6 +127,54 @@ def main() -> None:
                     ngo_id=ngo.id, title=title, location=location, required_skills=skills,
                     interests=interests, availability=days, description=f"{title} with {ngo.ngo_name}.",
                 ))
+        db.flush()
+
+        # Impact + finance demo: a past event with attendance, a received donation, stock and a beneficiary.
+        flood = db.scalar(select(Campaign).where(Campaign.ngo_id == ngo.id, Campaign.title == "Sylhet Flood Relief"))
+        teach = db.scalar(select(Opportunity).where(Opportunity.ngo_id == ngo.id,
+                                                    Opportunity.title == "Community Learning Facilitator"))
+        vol1 = db.scalar(select(Volunteer).where(Volunteer.user_id == users["volunteer1@example.com"].id))
+        if teach and not db.scalar(select(Application.id).where(Application.volunteer_id == vol1.id,
+                                                                Application.opportunity_id == teach.id)):
+            db.add(Application(volunteer_id=vol1.id, opportunity_id=teach.id, status=ApplicationStatus.ACCEPTED))
+        past = db.scalar(select(Event).where(Event.campaign_id == flood.id, Event.event_name == "Relief packing day"))
+        if past is None:
+            past = Event(campaign_id=flood.id, event_name="Relief packing day", event_date=flood.start_date,
+                         location="Sylhet", description="Packing relief kits.")
+            db.add(past)
+            db.flush()
+        if not db.scalar(select(Participation.id).where(Participation.volunteer_id == vol1.id,
+                                                        Participation.event_id == past.id)):
+            db.add(Participation(volunteer_id=vol1.id, event_id=past.id, attendance=True,
+                                 participation_date=past.event_date, hours=4))
+        donor = users["donor1@example.com"]
+        if not db.scalar(select(Donation.id).where(Donation.donor_id == donor.id)):
+            db.add(Donation(donor_id=donor.id, ngo_id=ngo.id, campaign_id=flood.id, amount=2000,
+                            donation_type=DonationType.MONEY, donation_date=today,
+                            status=DonationStatus.RECEIVED))
+            db.add(Donation(donor_id=donor.id, ngo_id=ngo.id, campaign_id=flood.id, amount=0,
+                            donation_type=DonationType.FOOD, donation_date=today, note="50 kg rice",
+                            status=DonationStatus.PENDING))
+        if not db.scalar(select(Resource.id).where(Resource.campaign_id == flood.id)):
+            db.add(Resource(campaign_id=flood.id, name="Rice", quantity_total=500, unit="kg"))
+        ben_row = db.scalar(select(Beneficiary).where(Beneficiary.user_id == ben.id))
+        if not db.scalar(select(CampaignBeneficiary.id).where(CampaignBeneficiary.campaign_id == flood.id,
+                                                              CampaignBeneficiary.beneficiary_id == ben_row.id)):
+            db.add(CampaignBeneficiary(campaign_id=flood.id, beneficiary_id=ben_row.id))
+        welcome = [
+            (users["volunteer1@example.com"].id, "Welcome to VolunteerSync",
+             "Fill in your profile to get ranked opportunity matches.", NotificationType.ANNOUNCEMENT,
+             NotificationPriority.NORMAL, "/profile"),
+            (users["volunteer1@example.com"].id, "Flood alert: Sylhet",
+             "Relief teams are needed this weekend. Check the Sylhet Flood Relief campaign.",
+             NotificationType.EMERGENCY_ALERT, NotificationPriority.HIGH, "/campaigns"),
+            (admin.id, "Welcome, NGO admin", "Review applications and confirm donations from your dashboard.",
+             NotificationType.ANNOUNCEMENT, NotificationPriority.NORMAL, "/admin"),
+        ]
+        for uid, title, message, ntype, priority, link in welcome:
+            if not db.scalar(select(Notification.id).where(Notification.user_id == uid, Notification.title == title)):
+                db.add(Notification(user_id=uid, title=title, message=message, notification_type=ntype,
+                                    priority=priority, link=link))
         db.commit()
     print("Seeded. Log in with any seeded email and password:", PASSWORD)
 

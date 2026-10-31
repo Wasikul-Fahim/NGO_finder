@@ -1,19 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  Bell,
   ChevronDown,
   HeartHandshake,
   Menu,
-  MessageSquare,
   Search,
-  Siren,
   X,
 } from "lucide-react";
 
 import api from "../api/client";
+import NotificationBell, { NotificationToast } from "./NotificationBell";
 import { useAuth } from "../context/AuthContext";
-import { adminNavigation, navigation } from "../data/dashboardData";
+import { adminNavigation, navigation, platformNavigation } from "../data/dashboardData";
 
 const ROLE_LABELS = {
   NGO_ADMIN: "NGO Admin",
@@ -33,6 +31,18 @@ const pageTitles = {
   "/admin/opportunities": "Opportunities",
   "/admin/applications": "Application Review",
   "/admin/tasks": "Task Assignment",
+  "/admin/attendance": "Attendance",
+  "/admin/donations": "Donations",
+  "/admin/resources": "Resources & Beneficiaries",
+  "/admin/reports": "Reports",
+  "/support": "My Support",
+  "/notifications": "Notifications",
+  "/admin/announcements": "Announcements",
+  "/admin/profile": "Organisation Profile",
+  "/platform": "Platform Overview",
+  "/platform/users": "Users",
+  "/platform/ngos": "NGOs",
+  "/platform/audit": "Audit Log",
   "/applications": "My Applications",
   "/profile": "My Profile",
   "/opportunities": "Volunteer Opportunities",
@@ -82,17 +92,7 @@ function SideNav({ onNavigate, mobile = false, items }) {
           })}
         </nav>
 
-        <div className="mt-auto rounded-2xl border border-amber-200/10 bg-gradient-to-br from-[#42205b] to-[#2b183d] p-4 shadow-xl shadow-black/10">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#f59e0b]/15 text-[#fbbf24]"><Siren size={18} /></span>
-            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#fbbf24]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#f59e0b]" /> Live alert</span>
-          </div>
-          <h3 className="text-sm font-bold text-white">Sylhet Flood Relief</h3>
-          <p className="mt-1.5 text-[11px] leading-5 text-white/50">The response team is active and needs more hands.</p>
-          <button className="mt-4 flex w-full items-center justify-center rounded-lg bg-[#f59e0b] px-3 py-2.5 text-[11px] font-bold text-[#3b1d06] transition hover:bg-[#fbbf24]">
-            Join response team
-          </button>
-        </div>
+        <div className="mt-auto" />
       </div>
 
       <div className="border-t border-white/10 px-7 py-5">
@@ -127,14 +127,8 @@ function TopNav({ onMenu, profileOpen, onProfileToggle, apiStatus, user, onLogou
           <span className={`h-2 w-2 rounded-full ${apiStatus === "online" ? "bg-emerald-500" : apiStatus === "checking" ? "animate-pulse bg-amber-400" : "bg-slate-300"}`} />
           {apiStatus === "online" ? "API connected" : apiStatus === "checking" ? "Checking API" : "Preview mode"}
         </div>
-        <button className="relative grid h-10 w-10 place-items-center rounded-xl text-slate-500 transition hover:bg-white hover:text-purple-700 hover:shadow-sm" aria-label="Emergency alerts">
-          <Bell size={19} />
-          <span className="absolute right-2 top-1.5 h-2 w-2 animate-pulse rounded-full bg-rose-500 ring-2 ring-[#fbfaff]" />
-        </button>
-        <button className="relative hidden h-10 w-10 place-items-center rounded-xl text-slate-500 transition hover:bg-white hover:text-purple-700 hover:shadow-sm sm:grid" aria-label="Messages">
-          <MessageSquare size={18} />
-          <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#6b21a8] px-1 text-[9px] font-bold text-white">3</span>
-        </button>
+        <NotificationBell />
+        
         <div className="relative ml-1 border-l border-slate-200 pl-3 sm:pl-4">
           <button onClick={onProfileToggle} className="flex items-center gap-2 rounded-xl p-1 transition hover:bg-white" aria-expanded={profileOpen}>
             <span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-[#c084fc] to-[#6b21a8] text-xs font-extrabold text-white shadow-sm">{initials(user.name)}</span>
@@ -152,7 +146,7 @@ export default function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const items = user.role === "NGO_ADMIN" ? adminNavigation : navigation.filter((item) => !item.roles || item.roles.includes(user.role));
+  const items = user.role === "NGO_ADMIN" ? adminNavigation : user.role === "PLATFORM_ADMIN" ? platformNavigation : navigation.filter((item) => !item.roles || item.roles.includes(user.role));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [apiStatus, setApiStatus] = useState("checking");
@@ -177,10 +171,11 @@ export default function AppShell() {
       <div className="min-w-0 flex-1">
         <TopNav onMenu={() => setMobileOpen(true)} profileOpen={profileOpen} onProfileToggle={() => setProfileOpen((value) => !value)} apiStatus={apiStatus} user={user} onLogout={async () => { await logout(); navigate("/login", { replace: true }); }} />
         <main className="mx-auto w-full max-w-[1600px] p-5 sm:p-8 lg:px-10 lg:py-9">
-          <div className="mb-7 flex items-end justify-between gap-4"><div><p className="mb-1 text-[11px] font-bold uppercase tracking-[0.2em] text-purple-600">{pageTitle}</p><div className="h-px w-9 bg-[#f59e0b]" /></div><p className="hidden text-xs font-medium text-slate-400 sm:block">Tuesday, October 01, 2024</p></div>
+          <div className="mb-7 flex items-end justify-between gap-4"><div><p className="mb-1 text-[11px] font-bold uppercase tracking-[0.2em] text-purple-600">{pageTitle}</p><div className="h-px w-9 bg-[#f59e0b]" /></div><p className="hidden text-xs font-medium text-slate-400 sm:block">{new Date().toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p></div>
           <Outlet />
         </main>
       </div>
+      <NotificationToast />
     </div>
   );
 }

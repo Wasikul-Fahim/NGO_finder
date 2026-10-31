@@ -7,12 +7,21 @@ from sqlalchemy.orm import joinedload
 from app.api.deps import CurrentNgo, CurrentUser, DbSession, VerifiedNgo
 from app.api.v1.volunteers import VolunteerUser, get_volunteer
 from app.core.errors import AppError, conflict, forbidden, not_found
-from app.models import Campaign, Opportunity, Task, TaskStatus
+from app.models import (
+    Campaign,
+    NotificationPriority,
+    NotificationType,
+    Opportunity,
+    Task,
+    TaskStatus,
+    Volunteer,
+)
 from app.schemas.common import Page
 from app.schemas.opportunity import TaskAssign, TaskCreate, TaskOut, TaskStatusChange, TaskUpdate
 from app.services import campaigns as campaign_svc
 from app.services import workflow
 from app.services.audit import log_action
+from app.services.notifications import notify
 from app.services.pagination import PageParams, paginate
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -40,6 +49,14 @@ def _get_owned(db, task_id: int, ngo) -> Task:
     return task
 
 
+def _notify_assigned(db, task: Task, campaign_title: str) -> None:
+    volunteer = db.get(Volunteer, task.volunteer_id)
+    notify(db, [volunteer.user_id], title="New task assigned",
+           message=f'You were assigned "{task.task_name}" in {campaign_title}.',
+           type=NotificationType.TASK_ASSIGNED, link="/tasks", priority=NotificationPriority.HIGH,
+           dedupe_key=f"task:{task.id}:{task.volunteer_id}")
+
+
 def _ensure_open(task: Task) -> None:
     if task.campaign.status in campaign_svc.LOCKED_STATUSES:
         raise conflict(f"Tasks cannot be changed on a {task.campaign.status.value.lower()} campaign.")
@@ -62,6 +79,8 @@ def create_task(data: TaskCreate, ngo: VerifiedNgo, user: CurrentUser, db: DbSes
     db.flush()
     log_action(db, user, "CREATE_TASK", "Task", task.id,
                {"campaign_id": campaign.id, "volunteer_id": data.volunteer_id})
+    if data.volunteer_id is not None:
+        _notify_assigned(db, task, campaign.title)
     db.commit()
     return to_out(db.scalar(_base().where(Task.id == task.id)))
 
@@ -122,6 +141,7 @@ def assign_task(task_id: int, data: TaskAssign, ngo: VerifiedNgo, user: CurrentU
     task.status = TaskStatus.PENDING  # a reassigned declined task starts over
     log_action(db, user, "ASSIGN_TASK", "Task", task.id,
                {"from_volunteer_id": previous, "to_volunteer_id": data.volunteer_id})
+    _notify_assigned(db, task, task.campaign.title)
     db.commit()
     db.refresh(task)  # drop the stale `volunteer` relationship loaded before reassignment
     return to_out(task)
@@ -135,5 +155,9 @@ def change_status(task_id: int, data: TaskStatusChange, user: VolunteerUser, db:
         raise not_found("Task")  # don't reveal other volunteers' tasks
     workflow.ensure_task_transition(task.status, data.status)
     task.status = data.status
+    notify(db, [task.campaign.ngo.user_id], title="Task update",
+           message=f'{user.name} marked "{task.task_name}" as {data.status.value.replace("_", " ").lower()}.',
+           type=NotificationType.TASK_UPDATE, link="/admin/tasks",
+           dedupe_key=f"taskstatus:{task.id}:{data.status.value}")
     db.commit()
     return to_out(task)

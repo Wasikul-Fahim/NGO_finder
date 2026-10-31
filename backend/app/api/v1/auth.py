@@ -10,6 +10,7 @@ from app.models import User
 from app.schemas.auth import (
     ChangePasswordRequest,
     LoginRequest,
+    NgoRegisterRequest,
     RegisterRequest,
     TokenResponse,
     UpdateProfileRequest,
@@ -56,6 +57,13 @@ def _token_response(user: User) -> TokenResponse:
 @router.post("/register", response_model=UserOut, status_code=201)
 def register(data: RegisterRequest, db: DbSession):
     return auth_service.register_user(db, data)
+
+
+@router.post("/register-ngo", response_model=UserOut, status_code=201)
+def register_ngo(data: NgoRegisterRequest, db: DbSession):
+    """Organisations join here. The account works immediately but the NGO stays PENDING (it cannot
+    post campaigns, opportunities or events) until a platform admin verifies it."""
+    return auth_service.register_ngo(db, data)
 
 
 @router.post("/login", response_model=TokenResponse)

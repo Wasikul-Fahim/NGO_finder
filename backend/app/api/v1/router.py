@@ -2,7 +2,23 @@ from fastapi import APIRouter
 from sqlalchemy import select
 
 from app.api.deps import DbSession
-from app.api.v1 import applications, auth, campaigns, events, ngos, opportunities, tasks, volunteers
+from app.api.v1 import (
+    admin,
+    applications,
+    auth,
+    campaigns,
+    donations,
+    events,
+    ngo_dashboard,
+    ngos,
+    notifications,
+    opportunities,
+    participation,
+    reports,
+    resources,
+    tasks,
+    volunteers,
+)
 
 api_router = APIRouter()
 
@@ -21,3 +37,10 @@ api_router.include_router(volunteers.router)
 api_router.include_router(opportunities.router)
 api_router.include_router(applications.router)
 api_router.include_router(tasks.router)
+api_router.include_router(participation.router)
+api_router.include_router(reports.router)
+api_router.include_router(donations.router)
+api_router.include_router(resources.router)
+api_router.include_router(notifications.router)
+api_router.include_router(admin.router)
+api_router.include_router(ngo_dashboard.router)

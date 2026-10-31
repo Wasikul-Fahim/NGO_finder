@@ -14,9 +14,20 @@ from app.core.security import (
     hash_refresh_token,
     verify_password,
 )
-from app.models import Beneficiary, RefreshToken, Role, User, Volunteer
+from app.models import (
+    NGO,
+    Beneficiary,
+    NotificationType,
+    RefreshToken,
+    Role,
+    User,
+    VerificationStatus,
+    Volunteer,
+)
 from app.models.base import utcnow
-from app.schemas.auth import RegisterRequest
+from app.schemas.auth import NgoRegisterRequest, RegisterRequest
+from app.services.audit import log_action
+from app.services.notifications import notify
 
 INVALID_CREDENTIALS = "Invalid email or password."
 
@@ -42,6 +53,34 @@ def register_user(db: Session, data: RegisterRequest) -> User:
         db.add(Volunteer(user_id=user.id, skills=[], interests=[], availability=[]))
     elif user.role == Role.BENEFICIARY:
         db.add(Beneficiary(user_id=user.id, name=user.name, location=user.location))
+    db.commit()
+    return user
+
+
+def register_ngo(db: Session, data: NgoRegisterRequest) -> User:
+    if db.scalar(select(User.id).where(User.email == data.email)):
+        raise _duplicate_email()
+    user = User(
+        name=data.name, email=data.email, password_hash=hash_password(data.password), phone=data.phone,
+        role=Role.NGO_ADMIN, location=data.location, is_active=True,
+    )
+    db.add(user)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise _duplicate_email() from None
+    ngo = NGO(
+        user_id=user.id, ngo_name=data.ngo_name, description=data.description, address=data.address,
+        contact=data.contact, verification_status=VerificationStatus.PENDING,
+    )
+    db.add(ngo)
+    db.flush()
+    log_action(db, user, "REGISTER_NGO", "NGO", ngo.id, {"ngo_name": ngo.ngo_name})
+    admins = db.scalars(select(User.id).where(User.role == Role.PLATFORM_ADMIN, User.is_active.is_(True)))
+    notify(db, admins, title="NGO awaiting verification",
+           message=f'"{ngo.ngo_name}" registered and is waiting to be verified.',
+           type=NotificationType.ANNOUNCEMENT, link="/platform/ngos", dedupe_key=f"ngo-signup:{ngo.id}")
     db.commit()
     return user
 

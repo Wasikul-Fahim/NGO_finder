@@ -151,9 +151,24 @@ class ApplicationOut(BaseModel):
     volunteer_name: str
     volunteer_location: str | None
     volunteer_skills: list[str]
+    # Only filled in for the NGO that owns the opportunity: applying shares contact details with it.
+    volunteer_email: str | None = None
+    volunteer_phone: str | None = None
     status: ApplicationStatus
     application_date: datetime
     review_note: str | None
+
+
+class ApplicationMessage(BaseModel):
+    message: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("message")
+    @classmethod
+    def _not_blank(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Write a message first.")
+        return v
 
 
 class ApplicationReview(BaseModel):

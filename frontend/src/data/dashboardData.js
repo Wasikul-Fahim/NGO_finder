@@ -16,10 +16,12 @@ export const navigation = [
   { label: "Volunteer Opportunities", path: "/opportunities", icon: Compass },
   { label: "My Applications", path: "/applications", icon: CheckSquare, roles: ["VOLUNTEER"] },
   { label: "My Profile", path: "/profile", icon: Users, roles: ["VOLUNTEER"] },
-  { label: "Active Campaigns", path: "/campaigns", icon: Megaphone, badge: 5 },
+  { label: "Active Campaigns", path: "/campaigns", icon: Megaphone },
   { label: "My Assigned Tasks", path: "/tasks", icon: ListTodo, roles: ["VOLUNTEER"] },
-  { label: "Donation & Resources", path: "/donations", icon: CircleDollarSign },
-  { label: "Impact & Analytics", path: "/impact", icon: BarChart3 },
+  { label: "My Donations", path: "/donations", icon: CircleDollarSign, roles: ["DONOR"] },
+  { label: "My Support", path: "/support", icon: Users, roles: ["BENEFICIARY"] },
+  { label: "My Impact", path: "/impact", icon: BarChart3, roles: ["VOLUNTEER"] },
+  { label: "Notifications", path: "/notifications", icon: Megaphone },
 ];
 
 export const adminNavigation = [
@@ -29,6 +31,21 @@ export const adminNavigation = [
   { label: "Opportunities", path: "/admin/opportunities", icon: Compass },
   { label: "Applications", path: "/admin/applications", icon: CheckSquare },
   { label: "Tasks", path: "/admin/tasks", icon: ListTodo },
+  { label: "Attendance", path: "/admin/attendance", icon: CheckSquare },
+  { label: "Donations", path: "/admin/donations", icon: CircleDollarSign },
+  { label: "Resources", path: "/admin/resources", icon: Users },
+  { label: "Reports", path: "/admin/reports", icon: BarChart3 },
+  { label: "Announcements", path: "/admin/announcements", icon: Megaphone },
+  { label: "Organisation Profile", path: "/admin/profile", icon: Users },
+  { label: "Notifications", path: "/notifications", icon: Megaphone },
+];
+
+export const platformNavigation = [
+  { label: "Platform Overview", path: "/platform", icon: LayoutDashboard },
+  { label: "NGOs & Verification", path: "/platform/ngos", icon: HeartHandshake },
+  { label: "Users", path: "/platform/users", icon: Users },
+  { label: "Audit Log", path: "/platform/audit", icon: CheckSquare },
+  { label: "Notifications", path: "/notifications", icon: Megaphone },
 ];
 
 export const metrics = [

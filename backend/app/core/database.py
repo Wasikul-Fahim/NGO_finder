@@ -29,3 +29,8 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 def get_db() -> Iterator[Session]:
     with SessionLocal() as session:
         yield session
+
+
+def get_session_factory():
+    """For long-lived connections (WebSockets) that must not hold a DB session open."""
+    return SessionLocal

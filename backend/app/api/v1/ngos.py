@@ -5,10 +5,11 @@ from sqlalchemy import or_, select
 
 from app.api.deps import CurrentNgo, CurrentUser, DbSession, require_roles
 from app.core.errors import conflict, not_found
-from app.models import NGO, Role, User, VerificationStatus
+from app.models import NGO, NotificationPriority, NotificationType, Role, User, VerificationStatus
 from app.schemas.common import Page
 from app.schemas.ngo import NgoOut, NgoUpdate, NgoVerify
 from app.services.audit import log_action
+from app.services.notifications import notify
 from app.services.pagination import PageParams, paginate
 
 router = APIRouter(prefix="/ngos", tags=["ngos"])
@@ -70,5 +71,11 @@ def verify_ngo(
         db, admin, "VERIFY_NGO" if target == VerificationStatus.VERIFIED else "REJECT_NGO", "NGO",
         ngo.id, {"from": previous.value, "to": target.value, "reason": data.reason},
     )
+    approved = target == VerificationStatus.VERIFIED
+    notify(db, [ngo.user_id], title="Your NGO was verified" if approved else "Your NGO was not verified",
+           message=("You can now post campaigns, opportunities and events." if approved else
+                    "Your organisation was not approved." + (f" Reason: {data.reason}" if data.reason else "")),
+           type=NotificationType.ANNOUNCEMENT, link="/admin",
+           priority=NotificationPriority.HIGH, dedupe_key=f"ngo-verify:{ngo.id}:{target.value}")
     db.commit()
     return ngo

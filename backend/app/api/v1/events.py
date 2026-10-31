@@ -7,11 +7,13 @@ from sqlalchemy.orm import joinedload
 
 from app.api.deps import CurrentUser, DbSession, OptionalUser, VerifiedNgo
 from app.core.errors import AppError, conflict, forbidden, not_found
-from app.models import Campaign, Event
+from app.models import Campaign, Event, NotificationPriority, NotificationType
 from app.schemas.campaign import EventCreate, EventOut, EventUpdate
 from app.schemas.common import Page
 from app.services import campaigns as svc
+from app.services import notifications
 from app.services.audit import log_action
+from app.services.notifications import notify
 from app.services.pagination import PageParams, paginate
 
 router = APIRouter(prefix="/events", tags=["events"])
@@ -127,3 +129,24 @@ def delete_event(event_id: int, ngo: VerifiedNgo, user: CurrentUser, db: DbSessi
                {"campaign_id": event.campaign_id, "event_name": event.event_name})
     db.delete(event)
     db.commit()
+
+
+@router.post("/{event_id}/reminders")
+def send_reminder(event_id: int, ngo: VerifiedNgo, user: CurrentUser, db: DbSession):
+    """Remind the NGO's accepted volunteers about an upcoming event (once per event per day)."""
+    event = _get_owned_event(db, event_id, ngo)
+    _ensure_open(event.campaign)
+    if event.event_date < date.today():
+        raise conflict("This event has already happened.")
+    audience = notifications.volunteer_user_ids(db, ngo.id)
+    when = f"{event.event_date}" + (f" at {event.event_time:%H:%M}" if event.event_time else "")
+    created = notify(
+        db, audience, title="Event reminder",
+        message=f'"{event.event_name}" ({event.campaign.title}) is on {when}'
+                + (f" in {event.location}." if event.location else "."),
+        type=NotificationType.EVENT_REMINDER, priority=NotificationPriority.NORMAL, link="/events",
+        dedupe_key=f"reminder:{event.id}:{date.today()}")
+    log_action(db, user, "SEND_EVENT_REMINDER", "Event", event.id,
+               {"audience_size": len(audience), "recipients": created})
+    db.commit()
+    return {"recipients": created, "audience_size": len(audience)}
