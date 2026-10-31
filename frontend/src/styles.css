@@ -1,0 +1,55 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Sora", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  color: #172033;
+  background: #fbfaff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  margin: 0;
+  background: #fbfaff;
+}
+
+button,
+a,
+input {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+.font-display {
+  font-family: "Sora", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+.surface-card {
+  border: 1px solid rgb(226 232 240 / 0.82);
+  border-radius: 1rem;
+  background: white;
+  box-shadow: 0 6px 18px rgb(76 29 149 / 0.035);
+}
+
+::selection {
+  color: #fff;
+  background: #6b21a8;
+}
