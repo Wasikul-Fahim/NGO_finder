@@ -19,6 +19,7 @@ from app.models import (
     Campaign,
     CampaignStatus,
     Event,
+    Opportunity,
     Role,
     User,
     VerificationStatus,
@@ -54,10 +55,16 @@ def main() -> None:
     with SessionLocal() as db:
         users = {u[0]: get_or_create_user(db, *u) for u in USERS}
 
-        for email in ("volunteer1@example.com", "volunteer2@example.com"):
+        profiles = {
+            "volunteer1@example.com": (["Teaching", "First Aid"], ["Education"], ["SAT", "SUN"]),
+            "volunteer2@example.com": (["Logistics", "Driving"], ["Disaster Relief"], ["FRI", "SAT"]),
+        }
+        for email, (skills, interests, days) in profiles.items():
             uid = users[email].id
             if not db.scalar(select(Volunteer.id).where(Volunteer.user_id == uid)):
-                db.add(Volunteer(user_id=uid, skills=[], interests=[], availability={}))
+                db.add(Volunteer(user_id=uid, skills=skills, interests=interests, availability=days))
+        users["volunteer1@example.com"].location = "Dhaka, Dhaka"
+        users["volunteer2@example.com"].location = "Sylhet, Sylhet"
         ben = users["beneficiary1@example.com"]
         if not db.scalar(select(Beneficiary.id).where(Beneficiary.user_id == ben.id)):
             db.add(Beneficiary(user_id=ben.id, name=ben.name, location=ben.location))
@@ -97,6 +104,17 @@ def main() -> None:
                     event_date=campaign.start_date + timedelta(days=max(0, start * -1 + 1)) if start < 0
                     else campaign.start_date,
                     location=location, description="Orientation and first distribution.",
+                ))
+        opportunities = [
+            ("Community Learning Facilitator", "Dhaka, Dhaka", ["Teaching"], ["Education"], ["SAT", "SUN"]),
+            ("Flood Relief Logistics Driver", "Sylhet, Sylhet", ["Driving", "Logistics"], ["Disaster Relief"], ["FRI", "SAT"]),
+            ("First Aid Camp Volunteer", "Gazipur, Dhaka", ["First Aid"], ["Health"], ["SUN"]),
+        ]
+        for title, location, skills, interests, days in opportunities:
+            if not db.scalar(select(Opportunity.id).where(Opportunity.ngo_id == ngo.id, Opportunity.title == title)):
+                db.add(Opportunity(
+                    ngo_id=ngo.id, title=title, location=location, required_skills=skills,
+                    interests=interests, availability=days, description=f"{title} with {ngo.ngo_name}.",
                 ))
         db.commit()
     print("Seeded. Log in with any seeded email and password:", PASSWORD)

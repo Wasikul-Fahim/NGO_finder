@@ -13,9 +13,11 @@ import {
 
 export const navigation = [
   { label: "Dashboard Overview", path: "/dashboard", icon: LayoutDashboard },
-  { label: "Volunteer Opportunities", path: "/opportunities", icon: Compass, badge: 12 },
+  { label: "Volunteer Opportunities", path: "/opportunities", icon: Compass },
+  { label: "My Applications", path: "/applications", icon: CheckSquare, roles: ["VOLUNTEER"] },
+  { label: "My Profile", path: "/profile", icon: Users, roles: ["VOLUNTEER"] },
   { label: "Active Campaigns", path: "/campaigns", icon: Megaphone, badge: 5 },
-  { label: "My Assigned Tasks", path: "/tasks", icon: ListTodo, badge: 4 },
+  { label: "My Assigned Tasks", path: "/tasks", icon: ListTodo, roles: ["VOLUNTEER"] },
   { label: "Donation & Resources", path: "/donations", icon: CircleDollarSign },
   { label: "Impact & Analytics", path: "/impact", icon: BarChart3 },
 ];
@@ -24,6 +26,9 @@ export const adminNavigation = [
   { label: "NGO Overview", path: "/admin", icon: LayoutDashboard },
   { label: "Manage Campaigns", path: "/admin/campaigns", icon: Megaphone },
   { label: "Manage Events", path: "/admin/events", icon: CalendarDays },
+  { label: "Opportunities", path: "/admin/opportunities", icon: Compass },
+  { label: "Applications", path: "/admin/applications", icon: CheckSquare },
+  { label: "Tasks", path: "/admin/tasks", icon: ListTodo },
 ];
 
 export const metrics = [

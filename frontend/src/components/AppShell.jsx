@@ -30,6 +30,11 @@ const pageTitles = {
   "/admin": "NGO Overview",
   "/admin/campaigns": "Manage Campaigns",
   "/admin/events": "Manage Events",
+  "/admin/opportunities": "Opportunities",
+  "/admin/applications": "Application Review",
+  "/admin/tasks": "Task Assignment",
+  "/applications": "My Applications",
+  "/profile": "My Profile",
   "/opportunities": "Volunteer Opportunities",
   "/campaigns": "Active Campaigns",
   "/tasks": "My Assigned Tasks",
@@ -147,7 +152,7 @@ export default function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const items = user.role === "NGO_ADMIN" ? adminNavigation : navigation;
+  const items = user.role === "NGO_ADMIN" ? adminNavigation : navigation.filter((item) => !item.roles || item.roles.includes(user.role));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [apiStatus, setApiStatus] = useState("checking");

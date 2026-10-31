@@ -39,7 +39,7 @@ def register_user(db: Session, data: RegisterRequest) -> User:
         db.rollback()
         raise _duplicate_email() from None
     if user.role == Role.VOLUNTEER:
-        db.add(Volunteer(user_id=user.id, skills=[], interests=[], availability={}))
+        db.add(Volunteer(user_id=user.id, skills=[], interests=[], availability=[]))
     elif user.role == Role.BENEFICIARY:
         db.add(Beneficiary(user_id=user.id, name=user.name, location=user.location))
     db.commit()

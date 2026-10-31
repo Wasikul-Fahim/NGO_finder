@@ -29,7 +29,7 @@ class Volunteer(TimestampMixin, Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True)
     skills: Mapped[list] = mapped_column(JSON, default=list)
     interests: Mapped[list] = mapped_column(JSON, default=list)
-    availability: Mapped[dict] = mapped_column(JSON, default=dict)
+    availability: Mapped[list] = mapped_column(JSON, default=list)
     experience: Mapped[str | None] = mapped_column(Text)
 
     user: Mapped[User] = relationship(back_populates="volunteer")

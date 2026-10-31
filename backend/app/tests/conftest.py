@@ -12,7 +12,7 @@ from sqlalchemy.pool import StaticPool
 from app.core.database import get_db
 from app.core.security import hash_password
 from app.main import app
-from app.models import NGO, Base, Role, User, VerificationStatus
+from app.models import NGO, Base, Role, User, VerificationStatus, Volunteer
 from app.services.rate_limit import login_limiter
 
 PASSWORD = "Passw0rdTest"
@@ -53,6 +53,9 @@ def make_user(db, email, role=Role.VOLUNTEER, name="Test User", active=True) -> 
         name=name, email=email, password_hash=hash_password(PASSWORD), role=role, is_active=active
     )
     db.add(user)
+    db.flush()
+    if role == Role.VOLUNTEER:
+        db.add(Volunteer(user_id=user.id, skills=[], interests=[], availability=[]))
     db.commit()
     return user
 
@@ -98,3 +101,9 @@ def volunteer_headers(db, client):
 def platform_headers(db, client):
     make_user(db, "root@example.com", Role.PLATFORM_ADMIN, name="Root")
     return login(client, "root@example.com")
+
+
+@pytest.fixture()
+def volunteer2_headers(db, client):
+    make_user(db, "vol2@example.com", name="Second Volunteer")
+    return login(client, "vol2@example.com")

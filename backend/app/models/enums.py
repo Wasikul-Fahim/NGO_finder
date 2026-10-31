@@ -29,3 +29,18 @@ class BeneficiaryStatus(enum.StrEnum):
     PENDING = "PENDING"
     ASSISTED = "ASSISTED"
     CLOSED = "CLOSED"
+
+
+class ApplicationStatus(enum.StrEnum):
+    SUBMITTED = "SUBMITTED"
+    UNDER_REVIEW = "UNDER_REVIEW"
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+
+
+class TaskStatus(enum.StrEnum):
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    DECLINED = "DECLINED"

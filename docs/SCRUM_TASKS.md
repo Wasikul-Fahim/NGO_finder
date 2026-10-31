@@ -7,15 +7,15 @@ API contract and phase detail live in `FULL_IMPLEMENTATION_PLAN.md`.
 |---|---|---|
 | SCRUM-1 | Authentication & Role-Based Access Control | Done (backend tests pass; see verification notes) |
 | SCRUM-2 | NGO, Campaign & Event Management | Done (backend tests pass; see verification notes) |
-| SCRUM-5 | Volunteer Opportunity & Smart Matching System | To do |
-| SCRUM-6 | Application & Task Management Workflow | To do |
+| SCRUM-5 | Volunteer Opportunity & Smart Matching System | Done (backend tests pass; see notes) |
+| SCRUM-6 | Application & Task Management Workflow | Done (backend tests pass; see notes) |
 | SCRUM-7 | Attendance, Contribution & Reporting | To do |
 | SCRUM-8 | Donation & Resource Monitoring | To do |
 | SCRUM-9 | Real-Time Notifications & Communication | To do |
 | SCRUM-10 | System Administration & Audit Logging | To do |
 | SCRUM-11 | NGO Management System | To do |
 
-Work order: SCRUM-1 and SCRUM-2 first, then the rest.
+Work order: SCRUM-1/2 (done), SCRUM-5/6 (done), then the rest.
 
 ### Verification notes (SCRUM-1 and SCRUM-2)
 - Verified: 51 backend tests, `ruff`, Alembic upgrade/downgrade/check on SQLite,
@@ -86,15 +86,59 @@ Acceptance criteria
 ---
 
 ## SCRUM-5 — Volunteer Opportunity & Smart Matching System
-Opportunity CRUD with search/filters, `services/matching.py` (weighted score:
-0.45 skills, 0.20 interests, 0.20 location, 0.15 availability), and
-`GET /opportunities/recommended` with a match explanation. Unit-tested ranking.
+
+Plan reference: Phase 3 (opportunities, volunteer profile) and Phase 5.
+
+Scope
+- `Opportunity` model and API: browse/search (title, location, skill, campaign, sort,
+  pagination); verified NGO admin create/update/deactivate, scoped to own NGO.
+- Volunteer profile: `GET/PATCH /volunteers/me` (skills, interests, availability days, experience, city).
+- `services/matching.py`: pure, deterministic scoring
+  `0.45*skills + 0.20*interests + 0.20*location + 0.15*availability` (weights from settings,
+  validated to sum to 1). Skills/interests use Jaccard; location is `City[, Region]` (same city 1.0,
+  same region 0.5); availability is the share of required days the volunteer can cover.
+- `GET /opportunities/recommended`: active opportunities of verified NGOs ranked best-first with
+  score, percentage, per-factor breakdown and "why matched" reasons; ties break by lowest id.
+- Frontend: Opportunities page (Recommended tab with match %, Browse tab with filters and Apply),
+  volunteer Profile page, NGO-admin Opportunities page.
+
+Acceptance criteria
+- [x] Score is 0..1 and deterministic; weights come from config.
+- [x] Unit tests cover ranking, no overlap, exact/partial location, availability, empty profile, ties.
+- [x] Inactive opportunities and unverified NGOs never appear publicly or in recommendations.
+- [x] Only the owning, verified NGO admin can create/edit/close an opportunity.
+- [x] Opportunity changes are audit-logged.
 
 ## SCRUM-6 — Application & Task Management Workflow
-Application state machine (`SUBMITTED -> UNDER_REVIEW -> ACCEPTED|REJECTED`),
-task state machine (`PENDING -> ACCEPTED -> IN_PROGRESS -> COMPLETED`, or
-`DECLINED`), tasks only assignable to volunteers with an accepted application,
-invalid transitions return 409.
+
+Plan reference: Phase 4 (applications and tasks; attendance is SCRUM-7).
+
+Scope
+- Application state machine `SUBMITTED -> UNDER_REVIEW -> ACCEPTED | REJECTED`; one application per
+  volunteer per opportunity (DB unique constraint plus a 409).
+- APIs: apply, `GET /applications/me`, NGO review queue `GET /applications`,
+  `PATCH /applications/{id}/review` (with optional note).
+- Task state machine `PENDING -> ACCEPTED -> IN_PROGRESS -> COMPLETED`, or `PENDING -> DECLINED`.
+  Volunteers move only their own tasks; NGO admins create, edit and (re)assign.
+- A task can only be assigned to a volunteer with an ACCEPTED application to this NGO (and to the
+  task's opportunity when it has one). A declined task can be reassigned and restarts as PENDING.
+- Invalid transitions return 409 `INVALID_TRANSITION`; ineligible assignee returns 409 `NOT_ELIGIBLE`.
+- Review, task create/update/assign are audit-logged.
+- Frontend: My Applications, My Tasks (accept/decline/start/complete), NGO-admin Applications review
+  queue and Tasks (create/assign) pages.
+
+Acceptance criteria
+- [x] Skipping or reversing a state returns 409 for both machines.
+- [x] Rejected/pending/other-NGO volunteers cannot be assigned tasks.
+- [x] A volunteer cannot see or change another volunteer's task (404); admins cannot drive volunteer status (403).
+- [x] The review queue is scoped to the admin's own NGO and exposes no volunteer email/phone.
+
+### Verification notes (SCRUM-5 and SCRUM-6)
+- Verified: 91 backend tests total, `ruff`, Alembic 0002 upgrade/downgrade/check on SQLite,
+  a live API run of the whole path (ranked matches -> apply -> review -> accept -> assign -> task
+  completed), `npm run build`.
+- Not verified: the React pages in a browser, MySQL, notifications on status changes (SCRUM-9).
+- `availability` is a list of weekday codes (`MON`..`SUN`) on both volunteers and opportunities.
 
 ## SCRUM-7 — Attendance, Contribution & Reporting
 Participation/attendance and hours, contribution history per volunteer,
