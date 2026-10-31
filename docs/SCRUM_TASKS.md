@@ -9,13 +9,13 @@ API contract and phase detail live in `FULL_IMPLEMENTATION_PLAN.md`.
 | SCRUM-2 | NGO, Campaign & Event Management | Done (backend tests pass; see verification notes) |
 | SCRUM-5 | Volunteer Opportunity & Smart Matching System | Done (backend tests pass; see notes) |
 | SCRUM-6 | Application & Task Management Workflow | Done (backend tests pass; see notes) |
-| SCRUM-7 | Attendance, Contribution & Reporting | To do |
-| SCRUM-8 | Donation & Resource Monitoring | To do |
+| SCRUM-7 | Attendance, Contribution & Reporting | Done (backend tests pass; see notes) |
+| SCRUM-8 | Donation & Resource Monitoring | Done (backend tests pass; see notes) |
 | SCRUM-9 | Real-Time Notifications & Communication | To do |
 | SCRUM-10 | System Administration & Audit Logging | To do |
 | SCRUM-11 | NGO Management System | To do |
 
-Work order: SCRUM-1/2 (done), SCRUM-5/6 (done), then the rest.
+Work order: SCRUM-1/2, 5/6 and 7/8 are done; then the rest.
 
 ### Verification notes (SCRUM-1 and SCRUM-2)
 - Verified: 51 backend tests, `ruff`, Alembic upgrade/downgrade/check on SQLite,
@@ -141,12 +141,62 @@ Acceptance criteria
 - `availability` is a list of weekday codes (`MON`..`SUN`) on both volunteers and opportunities.
 
 ## SCRUM-7 — Attendance, Contribution & Reporting
-Participation/attendance and hours, contribution history per volunteer,
-volunteer performance ranking and impact metrics.
+
+Plan reference: Phase 4 (participation, contributions) and Phase 6 (volunteer ranking).
+
+Scope
+- `Participation` model: attendance flag, hours (0-24), unique per volunteer and event.
+- `POST/PATCH /participation`, `GET /participation`: verified NGO admin records attendance for events
+  of their own campaigns, only for volunteers with an accepted application with that NGO, and only
+  once the event date has passed. Marking someone absent zeroes the hours.
+- `GET /contributions/me`: total hours, events attended, tasks completed/assigned, hours per month,
+  and the participation history (newest first).
+- `GET /reports/volunteer-performance`: ranking by hours then completed tasks (equal numbers share a
+  rank). NGO admins see their own NGO, platform admins see all; optional `campaign_id` filter.
+- Frontend: volunteer "My impact" page (replaces the demo numbers), NGO-admin Attendance and Reports pages.
+
+Acceptance criteria
+- [x] Duplicate attendance returns 409; hours outside 0-24 or hours on an absent volunteer return 422.
+- [x] Attendance cannot be recorded for future events, other NGOs' events, or non-accepted volunteers.
+- [x] Contribution totals update immediately after attendance or task completion.
+- [x] Ranking and report scope are tested, including NGO isolation.
+- [x] Attendance changes are audit-logged.
 
 ## SCRUM-8 — Donation & Resource Monitoring
-Donation bookkeeping (no payment data), resources and distributions,
-beneficiary support, donation summary per campaign, role-scoped visibility.
+
+Plan reference: Phase 6.
+
+Scope
+- `Donation` model (bookkeeping only) with `POST /donations` (donors), `GET /donations/me`,
+  NGO `GET /donations`, and `PATCH /donations/{id}/status` (`PENDING -> RECEIVED | REJECTED`, else 409).
+  The request schema rejects unknown fields, so card numbers/CVV/bank details can never be submitted or stored.
+  Donations are accepted only for ACTIVE campaigns of verified NGOs.
+- `Resource` and `ResourceDistribution`: per-campaign stock with an atomic check-and-increment, so
+  distributions can never exceed the total (409 "not enough stock"); the total can't drop below what's gone out.
+- `CampaignBeneficiary`: NGO admins enrol a registered beneficiary (by email) or record a new person for one
+  of their campaigns, and track `PENDING -> ACTIVE -> COMPLETED` support.
+- `GET /campaigns/{id}/utilization`: aggregate money received and resource usage. Visible to the owning NGO,
+  platform admins, and donors whose donation to that campaign was marked received. Contains no beneficiary data.
+- `GET /support/me`: a beneficiary sees only their own enrolment and what they personally received.
+- `GET /reports/donation-summary`: per-campaign received/pending money, donation and donor counts, by type.
+- Frontend: donor Donations page (donate, history, utilization), beneficiary Support page, real Campaigns
+  list for everyone, NGO-admin Donations, Resources & beneficiaries, and Reports pages.
+
+Acceptance criteria
+- [x] Only donors can donate; volunteers, beneficiaries and NGO admins get 403.
+- [x] Payment fields are rejected (422) and no such columns exist.
+- [x] Over-allocation is impossible; failed attempts leave stock unchanged.
+- [x] Volunteers, donors and other NGOs get 403 on beneficiary data; beneficiaries see only their own records.
+- [x] Donation confirmation, resource, distribution and enrolment changes are audit-logged.
+
+### Verification notes (SCRUM-7 and SCRUM-8)
+- Verified: 120 backend tests total, `ruff`, Alembic 0003 upgrade/downgrade/check on SQLite, seed run
+  twice, `npm run build`,, and a live API run of the whole flow on the seeded app.
+- Not verified: the React pages in a browser, MySQL, concurrent distributions under real parallel load
+  (the check-and-increment is a single SQL UPDATE, but only tested sequentially).
+- Finance writes (resources, enrolment, distributions) are blocked only on ARCHIVED campaigns, so a
+  COMPLETED campaign can still hand out leftover stock.
+- Notifications for donation/attendance updates arrive with SCRUM-9.
 
 ## SCRUM-9 — Real-Time Notifications & Communication
 Persisted notifications, REST list/mark-read, authenticated WebSocket

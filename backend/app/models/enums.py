@@ -44,3 +44,24 @@ class TaskStatus(enum.StrEnum):
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     DECLINED = "DECLINED"
+
+
+class DonationType(enum.StrEnum):
+    MONEY = "MONEY"
+    FOOD = "FOOD"
+    CLOTHES = "CLOTHES"
+    MEDICINE = "MEDICINE"
+    EDUCATIONAL = "EDUCATIONAL"
+    OTHER = "OTHER"
+
+
+class DonationStatus(enum.StrEnum):
+    PENDING = "PENDING"
+    RECEIVED = "RECEIVED"
+    REJECTED = "REJECTED"
+
+
+class SupportStatus(enum.StrEnum):
+    PENDING = "PENDING"
+    ACTIVE = "ACTIVE"
+    COMPLETED = "COMPLETED"

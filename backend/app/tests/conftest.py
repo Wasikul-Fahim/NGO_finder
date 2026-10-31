@@ -107,3 +107,25 @@ def platform_headers(db, client):
 def volunteer2_headers(db, client):
     make_user(db, "vol2@example.com", name="Second Volunteer")
     return login(client, "vol2@example.com")
+
+
+@pytest.fixture()
+def donor_headers(db, client):
+    make_user(db, "donor@example.com", Role.DONOR, name="Donor One")
+    return login(client, "donor@example.com")
+
+
+@pytest.fixture()
+def donor2_headers(db, client):
+    make_user(db, "donor2@example.com", Role.DONOR, name="Donor Two")
+    return login(client, "donor2@example.com")
+
+
+@pytest.fixture()
+def beneficiary_headers(db, client):
+    from app.models import Beneficiary
+
+    user = make_user(db, "ben@example.com", Role.BENEFICIARY, name="Ben Eficiary")
+    db.add(Beneficiary(user_id=user.id, name=user.name, location="Sylhet"))
+    db.commit()
+    return login(client, "ben@example.com")

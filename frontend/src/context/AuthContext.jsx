@@ -10,7 +10,7 @@ export const ROLE_HOME = {
   PLATFORM_ADMIN: "/dashboard",
   VOLUNTEER: "/dashboard",
   DONOR: "/campaigns",
-  BENEFICIARY: "/campaigns",
+  BENEFICIARY: "/support",
 };
 
 export function AuthProvider({ children }) {

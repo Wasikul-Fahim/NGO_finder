@@ -31,7 +31,7 @@ const STATUS_TONE = {
   SUBMITTED: "bg-slate-100 text-slate-600", UNDER_REVIEW: "bg-amber-50 text-amber-700",
   ACCEPTED: "bg-emerald-50 text-emerald-700", REJECTED: "bg-rose-50 text-rose-700",
   PENDING: "bg-amber-50 text-amber-700", IN_PROGRESS: "bg-blue-50 text-blue-700",
-  COMPLETED: "bg-emerald-50 text-emerald-700", DECLINED: "bg-rose-50 text-rose-700",
+  COMPLETED: "bg-emerald-50 text-emerald-700", ACTIVE: "bg-blue-50 text-blue-700", RECEIVED: "bg-emerald-50 text-emerald-700", DECLINED: "bg-rose-50 text-rose-700",
 };
 
 export function StatusPill({ status }) {

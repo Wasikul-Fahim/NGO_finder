@@ -2,6 +2,10 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import AppShell from "../components/AppShell";
 import { ROLE_HOME, useAuth } from "../context/AuthContext";
+import Attendance from "../pages/admin/Attendance";
+import IncomingDonations from "../pages/admin/IncomingDonations";
+import Reports from "../pages/admin/Reports";
+import ResourcesBeneficiaries from "../pages/admin/ResourcesBeneficiaries";
 import AdminOverview from "../pages/admin/AdminOverview";
 import ManageOpportunities from "../pages/admin/ManageOpportunities";
 import ManageTasks from "../pages/admin/ManageTasks";
@@ -18,6 +22,7 @@ import Login from "../pages/Login";
 import Opportunities from "../pages/Opportunities";
 import Profile from "../pages/Profile";
 import Register from "../pages/Register";
+import Support from "../pages/Support";
 import Tasks from "../pages/Tasks";
 import ProtectedRoute, { RoleRoute } from "./ProtectedRoute";
 
@@ -42,9 +47,14 @@ export default function AppRoutes() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/applications" element={<Applications />} />
           <Route path="/tasks" element={<Tasks />} />
+          <Route path="/impact" element={<Impact />} />
         </Route>
-        <Route path="/donations" element={<Donations />} />
-        <Route path="/impact" element={<Impact />} />
+        <Route element={<RoleRoute roles={["DONOR"]} />}>
+          <Route path="/donations" element={<Donations />} />
+        </Route>
+        <Route element={<RoleRoute roles={["BENEFICIARY"]} />}>
+          <Route path="/support" element={<Support />} />
+        </Route>
         <Route element={<RoleRoute roles={["NGO_ADMIN"]} />}>
           <Route path="/admin" element={<AdminOverview />} />
           <Route path="/admin/campaigns" element={<ManageCampaigns />} />
@@ -52,6 +62,10 @@ export default function AppRoutes() {
           <Route path="/admin/opportunities" element={<ManageOpportunities />} />
           <Route path="/admin/applications" element={<ReviewApplications />} />
           <Route path="/admin/tasks" element={<ManageTasks />} />
+          <Route path="/admin/attendance" element={<Attendance />} />
+          <Route path="/admin/donations" element={<IncomingDonations />} />
+          <Route path="/admin/resources" element={<ResourcesBeneficiaries />} />
+          <Route path="/admin/reports" element={<Reports />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
